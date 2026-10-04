@@ -92,7 +92,7 @@ describe('Страница документа', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Отменить анализ' }));
 
     expect(await screen.findByText('Анализ уже завершился, отменять нечего.')).toBeInTheDocument();
-    expect(await screen.findByText('Есть предложения ИИ')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Предложения ИИ' })).toBeInTheDocument();
   });
 
   it('404 ведёт на страницу «не найдено»', async () => {

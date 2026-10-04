@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/state';
-import { documentPolicy } from '@/domain/document/status';
+import { documentPolicy, type DocumentStatus } from '@/domain/document/status';
 import {
   DocumentStatusBadge,
   LOCKED_SOURCES_TEXT,
@@ -11,6 +11,7 @@ import {
   useDocumentDetail,
   useTrackDocumentOpen,
 } from '@/features/documents';
+import { EditorScreen, useEditorData } from '@/features/editor';
 import { useProjectDetail } from '@/features/projects';
 import { ProjectSourceEditor, SourceList } from '@/features/sources';
 import { getErrorMessage, isApiError } from '@/lib/errors';
@@ -18,7 +19,13 @@ import { formatBytes, formatDate } from '@/lib/format';
 
 import { NotFoundPage } from './NotFoundPage';
 
-/** Страница документа до редактора: статус, анализ и источники. Редактор — шаг 4. */
+const hasReviewResults = (status: DocumentStatus) =>
+  status === 'awaiting_approval' || status === 'ready';
+
+/**
+ * Страница документа. С результатами анализа — редактор правок, до них — статус,
+ * запуск анализа и источники.
+ */
 export function DocumentPage() {
   const { projectId = '', documentId = '' } = useParams();
   const document = useDocumentDetail(projectId, documentId);
@@ -45,6 +52,10 @@ export function DocumentPage() {
   }
 
   const doc = document.data;
+  if (hasReviewResults(doc.status)) {
+    return <DocumentEditor projectId={projectId} documentId={documentId} />;
+  }
+
   const projectName = project.data?.name;
   const baseSources = project.data?.sources ?? [];
   const specific = project.data?.documents?.find((d) => d.id === doc.id)?.sources ?? [];
@@ -128,4 +139,25 @@ export function DocumentPage() {
       </div>
     </>
   );
+}
+
+function DocumentEditor({ projectId, documentId }: { projectId: string; documentId: string }) {
+  const editor = useEditorData(projectId, documentId);
+  if (editor.isPending) {
+    return (
+      <div className="space-y-4" aria-label="Загрузка редактора">
+        <Skeleton className="h-12 w-full" />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <Skeleton className="h-96 w-full" />
+          <Skeleton className="h-96 w-full" />
+        </div>
+      </div>
+    );
+  }
+  if (editor.isError) {
+    return (
+      <ErrorState message={getErrorMessage(editor.error)} onRetry={() => void editor.refetch()} />
+    );
+  }
+  return <EditorScreen projectId={projectId} editor={editor.data} refetch={editor.refetch} />;
 }

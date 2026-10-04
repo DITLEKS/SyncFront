@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 import { cn } from '@/lib/cn';
 
@@ -14,6 +14,16 @@ interface SegmentedControlProps<T extends string> {
   options: SegmentedOption<T>[];
   ariaLabel: string;
   className?: string;
+  /** Подложка активного пункта переезжает с пружинной анимацией (переключатель режимов). */
+  sliding?: boolean;
+}
+
+/** Небольшой перелёт в конце — «пружина» без библиотеки анимаций. */
+const SPRING_EASING = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+
+interface IndicatorBox {
+  left: number;
+  width: number;
 }
 
 /**
@@ -26,8 +36,32 @@ export function SegmentedControl<T extends string>({
   options,
   ariaLabel,
   className,
+  sliding = false,
 }: SegmentedControlProps<T>) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [indicator, setIndicator] = useState<IndicatorBox | null>(null);
+  const activeIndex = options.findIndex((option) => option.value === value);
+
+  useLayoutEffect(() => {
+    if (!sliding) return undefined;
+    const measure = () => {
+      const button = refs.current[activeIndex];
+      // offsetWidth = 0 — разметка ещё не посчитана (или jsdom): остаёмся на обычной подсветке.
+      setIndicator(
+        button && button.offsetWidth > 0
+          ? { left: button.offsetLeft, width: button.offsetWidth }
+          : null,
+      );
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    const button = refs.current[activeIndex];
+    if (button?.parentElement) observer.observe(button.parentElement);
+    return () => observer.disconnect();
+  }, [sliding, activeIndex, options.length]);
+
+  const slidingReady = sliding && indicator !== null;
 
   const move = (from: number, delta: number) => {
     const next = (from + delta + options.length) % options.length;
@@ -41,8 +75,22 @@ export function SegmentedControl<T extends string>({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className={cn('inline-flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1', className)}
+      className={cn(
+        'relative inline-flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1',
+        className,
+      )}
     >
+      {slidingReady ? (
+        <span
+          aria-hidden
+          className="absolute top-1 h-7 rounded-md bg-card shadow-sm transition-[left,width] duration-500 motion-reduce:transition-none"
+          style={{
+            left: indicator.left,
+            width: indicator.width,
+            transitionTimingFunction: SPRING_EASING,
+          }}
+        />
+      ) : null}
       {options.map((option, index) => {
         const active = option.value === value;
         return (
@@ -66,10 +114,9 @@ export function SegmentedControl<T extends string>({
               }
             }}
             className={cn(
-              'inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-all duration-200',
-              active
-                ? 'bg-card text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
+              'relative inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-all duration-200',
+              active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+              active && !slidingReady && 'bg-card shadow-sm',
             )}
           >
             {option.label}

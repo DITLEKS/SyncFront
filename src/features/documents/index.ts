@@ -6,3 +6,4 @@ export { UploadDocumentDialog } from './components/UploadDocumentDialog';
 export { DocumentStatusPanel } from './components/DocumentStatusPanel';
 export { useDocumentDetail } from './hooks/useDocuments';
 export { useTrackDocumentOpen } from './hooks/useTrackDocumentOpen';
+export { formatLabel } from './model/format';

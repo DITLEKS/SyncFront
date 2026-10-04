@@ -1,4 +1,4 @@
-import { CheckCircle2, Loader2, Sparkles, TriangleAlert } from 'lucide-react';
+import { Loader2, Sparkles, TriangleAlert } from 'lucide-react';
 
 import type { DocumentResponse } from '@/api/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -18,7 +18,7 @@ function Panel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Главный блок страницы документа: что происходит с ним сейчас и что можно сделать. */
+/** Главный блок страницы документа до результатов анализа: что происходит и что можно сделать. */
 export function DocumentStatusPanel({ projectId, document }: DocumentStatusPanelProps) {
   const analysis = useAnalysisState(projectId, document);
 
@@ -77,28 +77,9 @@ export function DocumentStatusPanel({ projectId, document }: DocumentStatusPanel
       );
     }
 
+    // С результатами анализа страница показывает редактор, а не эту панель.
     case 'awaiting_approval':
-      return (
-        <Panel>
-          <Sparkles className="size-8 text-amber-600" aria-hidden />
-          <p className="font-medium">Есть предложения ИИ</p>
-          <p className="max-w-md text-sm text-muted-foreground">
-            Редактор для рассмотрения правок появится на шаге 4.
-          </p>
-        </Panel>
-      );
-
     case 'ready':
-      return (
-        <Panel>
-          <CheckCircle2 className="size-8 text-emerald-600" aria-hidden />
-          <p className="font-medium">Документ актуален</p>
-          <p className="max-w-md text-sm text-muted-foreground">
-            Просмотр и экспорт появятся на шаге 4. Если источники изменились, проверьте документ ещё
-            раз.
-          </p>
-          <StartAnalysisButton projectId={projectId} document={document} />
-        </Panel>
-      );
+      return null;
   }
 }

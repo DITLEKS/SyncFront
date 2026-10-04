@@ -12,6 +12,7 @@ import type {
   DocumentResponse,
   ProjectResponse,
   SourceResponse,
+  SuggestionResponse,
 } from '@/api/types';
 import type { DocumentStatus } from '@/domain/document/status';
 import { PROJECT_COLORS } from '@/domain/project/appearance';
@@ -29,6 +30,10 @@ interface DbDocument {
   currentJobId: string | null;
   suggestions: { total: number; pending: number; accepted: number; rejected: number };
   lastOpenedAt: string | null;
+  /** Текст и разделы для /editor; review_version растёт с каждым PUT /review. */
+  text: string;
+  sections: { ref: string; start_offset: number; end_offset: number }[];
+  reviewVersion: number;
 }
 
 interface DbSource extends SourceResponse {
@@ -40,6 +45,7 @@ export interface Db {
   documents: DbDocument[];
   sources: DbSource[];
   jobs: AnalysisJobResponse[];
+  suggestions: SuggestionResponse[];
   requests: { method: string; path: string; body?: unknown; headers?: Record<string, string> }[];
 }
 
@@ -50,7 +56,7 @@ export const id = (prefix: string) => {
 };
 
 export function createDb(): Db {
-  return { projects: [], documents: [], sources: [], jobs: [], requests: [] };
+  return { projects: [], documents: [], sources: [], jobs: [], suggestions: [], requests: [] };
 }
 
 export function addProject(db: Db, patch: Partial<ProjectResponse> = {}): ProjectResponse {
@@ -96,6 +102,9 @@ export function addDocument(
     currentJobId: null,
     suggestions: { total: 0, pending: 0, accepted: 0, rejected: 0 },
     lastOpenedAt: null,
+    text: '',
+    sections: [],
+    reviewVersion: 0,
     ...patch,
   };
   db.documents.push(doc);
@@ -139,6 +148,56 @@ export function addJob(
   return job;
 }
 
+export function addSuggestion(
+  db: Db,
+  doc: DbDocument,
+  patch: Partial<SuggestionResponse> & Pick<SuggestionResponse, 'change_type'>,
+): SuggestionResponse {
+  const suggestion: SuggestionResponse = {
+    id: id('g'),
+    document_id: doc.id,
+    analysis_job_id: doc.currentJobId ?? 'job',
+    section_ref: null,
+    original_text: null,
+    suggested_text: null,
+    rationale: null,
+    confidence_score: null,
+    block_id: null,
+    start_offset: null,
+    end_offset: null,
+    status: 'pending',
+    decided_by: null,
+    decided_at: null,
+    created_at: `2026-09-10T09:10:${String(db.suggestions.length).padStart(2, '0')}Z`,
+    ...patch,
+  };
+  db.suggestions.push(suggestion);
+  return suggestion;
+}
+
+function suggestionsOf(db: Db, doc: DbDocument) {
+  return db.suggestions.filter((s) => s.document_id === doc.id);
+}
+
+function countersOf(db: Db, doc: DbDocument) {
+  const list = suggestionsOf(db, doc);
+  const count = (status: SuggestionResponse['status']) =>
+    list.filter((s) => s.status === status).length;
+  return {
+    total: list.length,
+    pending: count('pending'),
+    accepted: count('accepted'),
+    rejected: count('rejected'),
+  };
+}
+
+const VIEW_MODES: Record<DocumentStatus, string> = {
+  draft: 'original',
+  in_progress: 'original',
+  awaiting_approval: 'suggested',
+  ready: 'clean',
+};
+
 function toResponse(doc: DbDocument): DocumentResponse {
   return {
     id: doc.id,
@@ -149,7 +208,7 @@ function toResponse(doc: DbDocument): DocumentResponse {
     uploaded_at: doc.uploadedAt,
     status: doc.status,
     current_analysis_job_id: doc.currentJobId,
-    review_version: 0,
+    review_version: doc.reviewVersion,
     analysis: null,
   };
 }
@@ -403,6 +462,172 @@ export function backendHandlers(db: Db) {
         return HttpResponse.json(job);
       },
     ),
+    http.get('/api/v1/projects/:projectId/documents/:documentId/editor', ({ request, params }) => {
+      log(request);
+      const doc = db.documents.find((d) => d.id === params.documentId);
+      if (!doc) return notFound();
+      const url = new URL(request.url);
+      const limit = Number(url.searchParams.get('suggestions_limit') ?? 50);
+      const offset = Number(url.searchParams.get('suggestions_offset') ?? 0);
+      const list = suggestionsOf(db, doc);
+      const content = { plain_text: doc.text, sections: doc.sections };
+      const withResults = doc.status === 'awaiting_approval' || doc.status === 'ready';
+      return HttpResponse.json({
+        document: {
+          id: doc.id,
+          title: doc.name,
+          format: doc.format,
+          status: doc.status,
+          current_analysis_job_id: doc.currentJobId,
+          created_at: doc.uploadedAt,
+          updated_at: doc.uploadedAt,
+          review_version: doc.reviewVersion,
+          view_mode: VIEW_MODES[doc.status],
+        },
+        content,
+        original_content: content,
+        suggestions: list.slice(offset, offset + limit),
+        suggestions_total: list.length,
+        counters: countersOf(db, doc),
+        permissions: {
+          can_analyze: doc.status !== 'in_progress',
+          can_review: doc.status === 'awaiting_approval',
+          can_export: doc.status === 'ready',
+          can_delete: doc.status !== 'in_progress',
+          sources_is_editable: !withResults && doc.status !== 'in_progress',
+        },
+      });
+    }),
+    http.get(
+      '/api/v1/projects/:projectId/documents/:documentId/suggestions',
+      ({ request, params }) => {
+        log(request);
+        const doc = db.documents.find((d) => d.id === params.documentId);
+        if (!doc) return notFound();
+        const url = new URL(request.url);
+        const limit = Number(url.searchParams.get('limit') ?? 50);
+        const offset = Number(url.searchParams.get('offset') ?? 0);
+        const list = suggestionsOf(db, doc);
+        return HttpResponse.json({
+          items: list.slice(offset, offset + limit),
+          total: list.length,
+          limit,
+          offset,
+        });
+      },
+    ),
+    http.put(
+      '/api/v1/projects/:projectId/documents/:documentId/suggestions/review',
+      async ({ request, params }) => {
+        const body = (await request.json()) as {
+          review_version: number;
+          decisions: { suggestion_id: string; decision: 'accepted' | 'rejected' }[];
+          finalize: boolean;
+        };
+        log(request, body);
+        const doc = db.documents.find((d) => d.id === params.documentId);
+        if (!doc) return notFound();
+        if (doc.status !== 'awaiting_approval') {
+          return HttpResponse.json({ detail: 'Документ не ожидает утверждения' }, { status: 409 });
+        }
+        const ifMatch = request.headers.get('If-Match');
+        if (ifMatch !== null && Number(ifMatch) !== doc.reviewVersion) {
+          return HttpResponse.json(
+            { detail: 'Документ изменён параллельным запросом. Обновите данные и повторите.' },
+            { status: 412 },
+          );
+        }
+        const list = suggestionsOf(db, doc);
+        const targets = body.decisions.map((d) => list.find((s) => s.id === d.suggestion_id));
+        if (targets.some((s) => !s || s.status !== 'pending')) {
+          return HttpResponse.json(
+            { detail: 'Часть правок не найдена в текущем анализе или уже обработана' },
+            { status: 409 },
+          );
+        }
+        const pendingAfter = list.filter((s) => s.status === 'pending').length - targets.length;
+        if (body.finalize && pendingAfter > 0) {
+          return HttpResponse.json(
+            { detail: `Нельзя завершить ревью: осталось правок — ${pendingAfter}` },
+            { status: 409 },
+          );
+        }
+        body.decisions.forEach((d, i) => {
+          const target = targets[i];
+          if (target) target.status = d.decision;
+        });
+        doc.reviewVersion += 1;
+        if (body.finalize) doc.status = 'ready';
+        const counters = countersOf(db, doc);
+        return HttpResponse.json({
+          document_id: doc.id,
+          document_status: doc.status,
+          review_version: doc.reviewVersion,
+          accepted_count: body.decisions.filter((d) => d.decision === 'accepted').length,
+          rejected_count: body.decisions.filter((d) => d.decision === 'rejected').length,
+          pending_count: counters.pending,
+          finalized: body.finalize,
+        });
+      },
+    ),
+    http.patch(
+      '/api/v1/projects/:projectId/documents/:documentId/suggestions',
+      async ({ request, params }) => {
+        const body = (await request.json()) as { ids: string[]; status: string };
+        log(request, body);
+        const doc = db.documents.find((d) => d.id === params.documentId);
+        if (!doc) return notFound();
+        const list = suggestionsOf(db, doc).filter((s) => body.ids.includes(s.id));
+        if (body.status !== 'pending') {
+          return HttpResponse.json({ detail: 'В тестах поддержан только сброс' }, { status: 400 });
+        }
+        list.forEach((s) => {
+          s.status = 'pending';
+        });
+        if (doc.status === 'ready') doc.status = 'awaiting_approval';
+        return HttpResponse.json({
+          updated_count: list.length,
+          document_status: doc.status,
+          review_version: doc.reviewVersion,
+        });
+      },
+    ),
+    http.post(
+      '/api/v1/projects/:projectId/documents/:documentId/editor/reset',
+      ({ request, params }) => {
+        log(request);
+        const doc = db.documents.find((d) => d.id === params.documentId);
+        if (!doc) return notFound();
+        const list = suggestionsOf(db, doc);
+        list.forEach((s) => {
+          s.status = 'pending';
+        });
+        doc.status = 'awaiting_approval';
+        return HttpResponse.json({
+          document_id: doc.id,
+          document_status: doc.status,
+          review_version: doc.reviewVersion,
+          suggestions_reset_count: list.length,
+        });
+      },
+    ),
+    http.get('/api/v1/projects/:projectId/documents/:documentId/export', ({ request, params }) => {
+      log(request);
+      const doc = db.documents.find((d) => d.id === params.documentId);
+      if (!doc) return notFound();
+      if (doc.status !== 'ready') {
+        return HttpResponse.json(
+          { detail: 'Экспорт доступен только для готового документа' },
+          { status: 409 },
+        );
+      }
+      return new HttpResponse(doc.text, {
+        headers: {
+          'Content-Type': 'text/markdown',
+          'Content-Disposition': `attachment; filename="export.md"; filename*=UTF-8''${encodeURIComponent(doc.name)}`,
+        },
+      });
+    }),
     http.post('/api/v1/projects/:projectId/documents/:documentId/open', ({ request, params }) => {
       log(request);
       const doc = db.documents.find((d) => d.id === params.documentId);

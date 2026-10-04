@@ -5,6 +5,7 @@
  * а не молча в рантайме.
  */
 import type { DocumentStatus } from '@/domain/document/status';
+import type { ChangeType, SuggestionStatus } from '@/domain/editor/suggestion';
 
 import type { components, paths } from './openapi.d.ts';
 
@@ -39,6 +40,9 @@ export type SuggestionResponse = Schemas['SuggestionResponse'];
 export type EditorAggregateResponse = Schemas['EditorAggregateResponse'];
 export type ReviewSaveRequest = Schemas['ReviewSaveRequest'];
 export type ReviewSaveResponse = Schemas['ReviewSaveResponse'];
+export type PatchSuggestionsResponse = Schemas['PatchSuggestionsResponse'];
+export type ResetResponse = Schemas['ResetResponse'];
+export type EditorContent = Schemas['EditorContent'];
 
 export type DashboardResponse = Schemas['DashboardResponse'];
 export type AttentionDocumentItem = Schemas['AttentionDocumentItem'];
@@ -57,3 +61,10 @@ type Equal<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 // Статусная модель домена обязана совпадать с DocumentStatusVO бэкенда.
 export const documentStatusContractMatches: Equal<Schemas['DocumentStatusVO'], DocumentStatus> =
   true;
+
+// Типы и статусы правок домена редактора — тот же контракт для SuggestionResponse.
+export const changeTypeContractMatches: Equal<SuggestionResponse['change_type'], ChangeType> = true;
+export const suggestionStatusContractMatches: Equal<
+  SuggestionResponse['status'],
+  SuggestionStatus
+> = true;
