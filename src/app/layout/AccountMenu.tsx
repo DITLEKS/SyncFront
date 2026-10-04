@@ -29,13 +29,23 @@ export function AccountMenu({ collapsed }: { collapsed: boolean }) {
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className={cn('w-full justify-start gap-3', collapsed && 'justify-center px-0')}
+          className={cn(
+            'mt-3 h-auto min-h-12 w-full justify-center gap-3 rounded-xl px-0 py-2',
+            !collapsed && 'md:justify-start md:border md:bg-card md:px-2 md:shadow-sm',
+          )}
           aria-label="Аккаунт"
         >
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary">
-            <UserRound className="size-3.5" />
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-white">
+            <UserRound className="size-4" />
           </span>
-          {!collapsed ? <span className="truncate text-sm">{user?.email ?? 'Аккаунт'}</span> : null}
+          {!collapsed ? (
+            <span className="hidden min-w-0 text-left md:block">
+              <span className="block truncate text-sm font-semibold">
+                {user ? ROLE_LABEL[user.role] : 'Аккаунт'}
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">{user?.email}</span>
+            </span>
+          ) : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-64">

@@ -2,29 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Токены shadcn/ui. Базовый цвет — slate, акцент — индиго (фирменный цвет SyncScribe). */
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./assets/fonts/inter-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./assets/fonts/inter-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./assets/fonts/inter-700.woff2') format('woff2');
+}
+
+/* Светлая палитра Figma Make, адаптированная к HSL-токенам Tailwind 3. */
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222.2 47.4% 11.2%;
+    --background: 48 18.5% 94.7%;
+    --foreground: 255 8.3% 9.4%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 47.4% 11.2%;
+    --card-foreground: 255 8.3% 9.4%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47.4% 11.2%;
-    --primary: 243 75% 59%;
+    --popover-foreground: 255 8.3% 9.4%;
+    --primary: 238.7 83.5% 66.7%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 94%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 94%;
-    --muted-foreground: 215.4 16.3% 44%;
-    --accent: 226 100% 97%;
-    --accent-foreground: 243 75% 40%;
-    --destructive: 0 72% 51%;
+    --secondary: 48 15.2% 93.5%;
+    --secondary-foreground: 252 4.4% 22.2%;
+    --muted: 48 16.1% 93.9%;
+    --muted-foreground: 253.3 4.1% 43.3%;
+    --accent: 225.9 100% 96.7%;
+    --accent-foreground: 244.5 57.9% 50.6%;
+    /* Более тёмный цвет кнопок сохраняет контраст белого текста. */
+    --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214.3 31.8% 90%;
-    --input: 214.3 31.8% 88%;
-    --ring: 243 75% 59%;
-    --radius: 0.75rem;
+    --border: 255 8.3% 9.4% / 0.07;
+    --input: 255 8.3% 9.4% / 0.12;
+    --ring: 238.7 83.5% 66.7%;
+    --radius: 0.5rem;
   }
 
   * {
@@ -43,5 +73,17 @@
   /* Видимый фокус для клавиатурной навигации, без обводки при клике мышью. */
   :focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+/* Анимации не должны мешать пользователям с reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
