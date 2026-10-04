@@ -1448,6 +1448,11 @@ export interface components {
             /** Status */
             status: string;
             /**
+             * Uploaded At
+             * Format: date-time
+             */
+            uploaded_at: string;
+            /**
              * Last Opened At
              * Format: date-time
              */

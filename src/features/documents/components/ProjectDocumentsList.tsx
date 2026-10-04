@@ -23,7 +23,7 @@ interface ProjectDocumentsListProps {
   baseSources: SourceResponse[];
 }
 
-const LOCKED_SOURCES =
+export const LOCKED_SOURCES_TEXT =
   'Во время анализа и рассмотрения правок источники доступны только для просмотра';
 
 /** Документы проекта; одновременно раскрыта не больше чем одна строка с источниками. */
@@ -184,7 +184,9 @@ function ProjectDocumentRow({
               projectId={projectId}
               target={{ scope: 'document', documentId: doc.id }}
               items={specific}
-              lockedReason={documentPolicy.canEditSources(doc.status) ? undefined : LOCKED_SOURCES}
+              lockedReason={
+                documentPolicy.canEditSources(doc.status) ? undefined : LOCKED_SOURCES_TEXT
+              }
               emptyText="Для документа не добавлено специфичных источников."
             />
           </section>

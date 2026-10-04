@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '@/api/queryKeys';
-import { getAnalysisJob, startAnalysis, startBulkAnalysis } from '@/api/resources/analysis';
+import {
+  cancelAnalysisJob,
+  getAnalysisJob,
+  startAnalysis,
+  startBulkAnalysis,
+} from '@/api/resources/analysis';
 import type { AnalysisState } from '@/api/types';
 import {
   analysisStateFromContract,
@@ -36,6 +41,23 @@ export function useStartAnalysis(projectId: string) {
     mutationFn: ({ documentId, force }: { documentId: string; force: boolean }) =>
       startAnalysis({ projectId, documentId, force, idempotencyKey: uuidV4() }),
     onSettled: () => invalidate(projectId),
+  });
+}
+
+export function useCancelAnalysis(projectId: string) {
+  const invalidate = useInvalidateAfterAnalysis();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ documentId, jobId }: { documentId: string; jobId: string }) =>
+      cancelAnalysisJob(projectId, documentId, jobId),
+    // При 409 задача уже завершилась сама: в любом случае перечитываем документ.
+    onSettled: (_job, _error, { documentId }) =>
+      Promise.all([
+        invalidate(projectId),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.analysisJobs.byDocument(projectId, documentId),
+        }),
+      ]),
   });
 }
 

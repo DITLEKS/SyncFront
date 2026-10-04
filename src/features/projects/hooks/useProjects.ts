@@ -9,11 +9,9 @@ import {
   updateProject,
 } from '@/api/resources/projects';
 import type { ProjectResponse } from '@/api/types';
+import { REALTIME_FALLBACK_POLL_MS, useRealtimeConnected } from '@/features/sse';
 
 export const PROJECTS_PAGE_SIZE = 30;
-
-/** Интервал опроса, пока в проекте идёт анализ; на шаге 3 его заменят SSE-события. */
-export const ACTIVE_ANALYSIS_POLL_MS = 5000;
 
 export function useProjectsInfinite() {
   return useInfiniteQuery({
@@ -29,12 +27,14 @@ export function useProjectsInfinite() {
 
 /** Страница проекта одним запросом: базовые источники и документы с бейджами источников. */
 export function useProjectDetail(projectId: string) {
+  const realtime = useRealtimeConnected();
   return useQuery({
     queryKey: queryKeys.projects.detail(projectId),
     queryFn: () => getProject(projectId, ['documents', 'sources']),
+    // Статусы приходят по SSE; опрос — только пока соединения нет.
     refetchInterval: (query) =>
-      query.state.data?.documents?.some((d) => d.status === 'in_progress')
-        ? ACTIVE_ANALYSIS_POLL_MS
+      !realtime && query.state.data?.documents?.some((d) => d.status === 'in_progress')
+        ? REALTIME_FALLBACK_POLL_MS
         : false,
   });
 }

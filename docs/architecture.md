@@ -98,8 +98,8 @@
 src/
   main.tsx            точка входа
   app/                composition root: провайдеры, роутер, layout, ErrorBoundary
-    providers/        QueryProvider, AppProviders (Auth → Capabilities → Tooltip; SSE — шаг 3)
-    layout/           AppShell, Sidebar, AccountMenu
+    providers/        QueryProvider, AppProviders (Auth → Capabilities → Tooltip)
+    layout/           AppShell (внутри — RealtimeProvider), Sidebar, AccountMenu
     router.tsx        createBrowserRouter + routes (единственное место путей)
   pages/              тонкие страницы: собирают фичи, не ходят в API
   features/           bounded contexts; снаружи виден только index.ts
@@ -108,13 +108,14 @@ src/
     projects/         шаг 2
     documents/        шаг 2
     sources/          шаг 2
-    dashboard/        шаг 3
-    sse/              шаг 3
-    analysis/         шаг 3
+    dashboard/        показатели, «Требуют внимания», «Недавние», быстрые действия
+    sse/              RealtimeProvider, соединение, разбор событий, флаг соединения (Zustand)
+    analysis/         запуск, групповой запуск, отмена, состояние анализа
     editor/           шаг 4
   domain/             чистый TS без React/fetch: словарь и правила предметной области
     document/status.ts        statusMeta, documentPolicy, analysisActionLabel
-    analysis/errorCodes.ts    коды ошибок воркера → подсказки
+    analysis/analysisState.ts состояние анализа из analysis или задачи
+    dashboard/trend.ts        геометрия мини-графика, направление тренда
     editor/                   шаг 4: applySuggestions, overlap detection, decision buffer
   api/                инфраструктура доступа к бэкенду (чистые функции, без React)
     openapi.d.ts      сгенерировано openapi-typescript (npm run api:types)
@@ -165,11 +166,14 @@ app      → всё
 - SSE-событие `document_status_changed` → `setQueryData` для детали документа (статус и `current_analysis_job_id`) и инвалидация списков,
   дашборда, attention/recent; для открытого редактора — повторный `GET /editor` с сохранением буфера.
 
-### 4.3. Реальное время (шаг 3)
+### 4.3. Реальное время
 
-Один `SseProvider` внутри защищённого layout: `fetch` + `ReadableStream` + `createSseParser`, `AbortController`, переподключение
-с экспоненциальной задержкой 1→30 с, при 401 — сначала `authSession.refresh()`, watchdog «нет `ping` > 60 с → переподключиться».
-Fallback: пока соединения нет, документы в `in_progress` опрашивают `GET …/analysis-jobs/{j}` раз в 5 с (`refetchInterval` зависит от флага `sse.connected`).
+`RealtimeProvider` внутри защищённого layout держит одно соединение: `fetch` + `ReadableStream` + `createSseParser`, `AbortController`.
+Переподключение 1 → 30 с с удвоением, сброс после открытия; на 401 — сначала `authSession.refresh()`, при неудаче соединение останавливается.
+Watchdog: 60 с без данных (сервер пингует раз в 25 с) → переподключиться; тот же таймаут страхует повисший запрос.
+После переподключения кеш документов, проектов и дашборда перечитывается.
+Fallback: состояние соединения в Zustand (`useRealtimeStore`); пока его нет, списки и деталь документа с `in_progress` опрашиваются раз в 5 с,
+дашборд — раз в 15 с. С соединением опроса нет.
 
 ### 4.4. Редактор (шаг 4)
 
@@ -221,6 +225,9 @@ Fallback: пока соединения нет, документы в `in_progre
 | A-9  | Групповой анализ шлёт явный список `draft` + `ready`                    | Без списка сервер включил бы `awaiting_approval`, а UI их исключает                        |
 | A-10 | Состояние анализа восстанавливается из задачи, если `analysis = null`   | Запасной путь для ответов без `analysis`; с SyncBack #65 сервер заполняет поле сам         |
 | A-11 | Цвет и иконку проекта задаёт сервер, UI их только показывает            | Решение владельца для MVP: в меню проекта только «Переименовать» и «Удалить»               |
+| A-12 | SSE на `fetch` + свой парсер, без `@microsoft/fetch-event-source`       | Нужен Bearer-заголовок; свой парсер уже покрыт тестами, меньше зависимостей                |
+| A-13 | Мини-графики дашборда — собственный SVG                                 | Семь точек не стоят библиотеки графиков в бандле                                           |
+| A-14 | Отмена анализа — на странице документа в `in_progress`                  | В «Описании UI» её нет, промпт требует; закрытие окна загрузки анализ не отменяет          |
 
 ---
 
@@ -233,4 +240,5 @@ Fallback: пока соединения нет, документы в `in_progre
 4. **`original_content` в `GET /editor`** дублирует `content` (F-7). Фронт использует только `content`; поле можно убрать.
 5. ~~**Отчёт шага 2, B-1…B-3**~~ — исправлено в SyncBack #65: `analysis`, счётчики, `color`/`icon` приходят с сервера.
 6. **Удаление документа в `awaiting_approval`:** сервер разрешает, таблица действий в UI — нет. Сейчас следуем серверу.
-7. **Пароль:** политика сложности видна только по тексту 422. Если появится описание политики в `/system/capabilities`, подсказку под полем можно сделать точной.
+7. **B-9:** нужен ли `?document_id=` в `GET …/sources` (сейчас источники документа берутся из `include=documents` с лимитом 200)?
+8. **Пароль:** политика сложности видна только по тексту 422. Если появится описание политики в `/system/capabilities`, подсказку под полем можно сделать точной.

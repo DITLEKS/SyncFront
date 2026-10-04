@@ -48,6 +48,12 @@ export const VALID_PASSWORD = 'Correct-Horse-9';
 export const handlers = [
   http.get('/api/v1/system/capabilities', () => HttpResponse.json(TEST_CAPABILITIES)),
 
+  // Тихий поток по умолчанию: соединение открыто, событий нет.
+  http.get(
+    '/api/v1/events/documents',
+    () => new Response(new ReadableStream(), { headers: { 'Content-Type': 'text/event-stream' } }),
+  ),
+
   http.post('/api/v1/auth/login', async ({ request }) => {
     const body = (await request.json()) as { email: string; password: string };
     if (body.email === TEST_USER.email && body.password === VALID_PASSWORD) {
