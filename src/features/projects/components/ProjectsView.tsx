@@ -11,6 +11,7 @@ import { useProjectsInfinite } from '../hooks/useProjects';
 
 import { CreateProjectDialog } from './CreateProjectDialog';
 import { DeleteProjectDialog } from './DeleteProjectDialog';
+import { ProjectAppearanceDialog } from './ProjectAppearanceDialog';
 import { ProjectCard } from './ProjectCard';
 import { RenameProjectDialog } from './RenameProjectDialog';
 
@@ -24,6 +25,7 @@ export function ProjectsView({ renderHeader }: ProjectsViewProps) {
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState<ProjectResponse | null>(null);
   const [deleting, setDeleting] = useState<ProjectResponse | null>(null);
+  const [styling, setStyling] = useState<ProjectResponse | null>(null);
 
   const projects = query.data?.pages.flatMap((page) => page.items) ?? [];
   const total = query.data?.pages[0]?.total ?? null;
@@ -66,6 +68,7 @@ export function ProjectsView({ renderHeader }: ProjectsViewProps) {
                 key={project.id}
                 project={project}
                 onRename={setRenaming}
+                onEditAppearance={setStyling}
                 onDelete={setDeleting}
               />
             ))}
@@ -86,6 +89,10 @@ export function ProjectsView({ renderHeader }: ProjectsViewProps) {
 
       <CreateProjectDialog open={creating} onOpenChange={setCreating} />
       <RenameProjectDialog project={renaming} onOpenChange={(open) => !open && setRenaming(null)} />
+      <ProjectAppearanceDialog
+        project={styling}
+        onOpenChange={(open) => !open && setStyling(null)}
+      />
       <DeleteProjectDialog project={deleting} onOpenChange={(open) => !open && setDeleting(null)} />
     </>
   );

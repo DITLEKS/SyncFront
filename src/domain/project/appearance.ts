@@ -1,6 +1,7 @@
 /**
  * Внешний вид карточки проекта. Цвет только различает проекты и не несёт статуса.
- * Палитра совпадает с PROJECT_COLORS бэкенда (app/api/schemas/project.py).
+ * Палитра совпадает с PROJECT_COLORS бэкенда (app/domain/project_appearance.py):
+ * цвет вне её сервер отклоняет с 422.
  */
 
 export const PROJECT_COLORS = [
@@ -16,7 +17,24 @@ export const PROJECT_COLORS = [
 
 export type ProjectColor = (typeof PROJECT_COLORS)[number];
 
-const HEX6 = /^[0-9A-Fa-f]{6}$/;
+export const PROJECT_COLOR_LABELS: Record<ProjectColor, string> = {
+  '3B82F6': 'Синий',
+  '8B5CF6': 'Фиолетовый',
+  '10B981': 'Изумрудный',
+  F59E0B: 'Янтарный',
+  EF4444: 'Красный',
+  EC4899: 'Розовый',
+  '14B8A6': 'Бирюзовый',
+  F97316: 'Оранжевый',
+};
+
+/** Цвет из палитры в каноническом виде (без '#', верхний регистр) или null. */
+export function normalizeProjectColor(value: string | null | undefined): ProjectColor | null {
+  const color = value?.trim().replace(/^#/, '').toUpperCase();
+  return (PROJECT_COLORS as readonly string[]).includes(color ?? '')
+    ? (color as ProjectColor)
+    : null;
+}
 
 /** Стабильный хеш строки (FNV-1a), чтобы цвет не менялся между перезагрузками. */
 function hash(value: string): number {
@@ -29,11 +47,12 @@ function hash(value: string): number {
 }
 
 /**
- * Цвет проекта: значение сервера, если оно валидно, иначе детерминированный цвет из палитры по id.
- * Сервер пока не сохраняет color, поэтому запасной вариант — основной путь.
+ * Цвет проекта для отображения: сохранённый на сервере, а если его нет (ответ без поля
+ * или устаревшее значение) — стабильный цвет палитры по id, чтобы карточка не была серой.
  */
 export function projectColor(project: { id: string; color?: string | null }): string {
-  if (project.color && HEX6.test(project.color)) return `#${project.color.toUpperCase()}`;
+  const saved = normalizeProjectColor(project.color);
+  if (saved) return `#${saved}`;
   const index = hash(project.id) % PROJECT_COLORS.length;
   return `#${PROJECT_COLORS[index] ?? PROJECT_COLORS[0]}`;
 }
@@ -55,6 +74,21 @@ export const PROJECT_ICON_NAMES = [
 ] as const;
 
 export type ProjectIconName = (typeof PROJECT_ICON_NAMES)[number];
+
+export const PROJECT_ICON_LABELS: Record<ProjectIconName, string> = {
+  'folder-kanban': 'Папка',
+  'book-open': 'Книга',
+  'file-code': 'Код',
+  server: 'Сервер',
+  shield: 'Щит',
+  rocket: 'Ракета',
+  boxes: 'Модули',
+  cloud: 'Облако',
+  database: 'База данных',
+  workflow: 'Процесс',
+  globe: 'Глобус',
+  cpu: 'Процессор',
+};
 
 export type ProjectIcon =
   | { kind: 'lucide'; name: ProjectIconName }

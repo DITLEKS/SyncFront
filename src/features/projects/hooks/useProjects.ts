@@ -51,7 +51,12 @@ function useInvalidateProjects() {
 export function useCreateProject() {
   const invalidate = useInvalidateProjects();
   return useMutation({
-    mutationFn: (input: { name: string; description: string | null }) => createProject(input),
+    mutationFn: (input: {
+      name: string;
+      description: string | null;
+      color?: string | null;
+      icon?: string | null;
+    }) => createProject(input),
     onSuccess: () => invalidate(),
   });
 }
@@ -66,6 +71,30 @@ export function useRenameProject() {
       // Ответ PATCH без include: сохраняем документы и источники из кеша страницы.
       queryClient.setQueryData<ProjectResponse>(queryKeys.projects.detail(updated.id), (old) =>
         old ? { ...old, name: updated.name, description: updated.description } : old,
+      );
+      void invalidate();
+    },
+  });
+}
+
+export function useUpdateProjectAppearance() {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({
+      projectId,
+      color,
+      icon,
+    }: {
+      projectId: string;
+      color: string;
+      icon: string | null;
+    }) =>
+      // Пустая строка — договорённость API о сбросе иконки к значению по умолчанию.
+      updateProject(projectId, { color, icon: icon ?? '' }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<ProjectResponse>(queryKeys.projects.detail(updated.id), (old) =>
+        old ? { ...old, color: updated.color, icon: updated.icon } : old,
       );
       void invalidate();
     },

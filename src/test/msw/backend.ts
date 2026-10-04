@@ -1,7 +1,8 @@
 /**
  * Небольшой бэкенд в памяти для интеграционных тестов экранов проектов и документов.
- * Повторяет контракт, включая известные расхождения: счётчики проекта = 0, analysis = null,
- * вложенный detail у 409 confirmation_required.
+ * Повторяет контракт SyncBack: счётчики проекта считаются по документам и базовым источникам,
+ * цвет — из палитры (иначе 422), вложенный detail у 409 confirmation_required.
+ * analysis в списках не заполняется — так проверяется запасной путь через задачу анализа.
  */
 import { HttpResponse, http } from 'msw';
 
@@ -13,6 +14,7 @@ import type {
   SourceResponse,
 } from '@/api/types';
 import type { DocumentStatus } from '@/domain/document/status';
+import { normalizeProjectColor, PROJECT_COLORS } from '@/domain/project/appearance';
 
 import { TEST_USER } from './handlers';
 
@@ -66,6 +68,19 @@ export function addProject(db: Db, patch: Partial<ProjectResponse> = {}): Projec
   db.projects.push(project);
   return project;
 }
+
+/** Проект в виде ответа сервера: счётчики считаются по текущему состоянию базы. */
+function projectView(db: Db, project: ProjectResponse): ProjectResponse {
+  return {
+    ...project,
+    document_count: db.documents.filter((d) => d.projectId === project.id).length,
+    source_count: db.sources.filter((s) => s.project_id === project.id && s.scope === 'project')
+      .length,
+  };
+}
+
+const invalidColor = () =>
+  HttpResponse.json({ detail: 'Недопустимый цвет проекта' }, { status: 422 });
 
 export function addDocument(
   db: Db,
@@ -193,18 +208,31 @@ export function backendHandlers(db: Db) {
       const limit = Number(url.searchParams.get('limit') ?? 50);
       const offset = Number(url.searchParams.get('offset') ?? 0);
       return HttpResponse.json({
-        items: db.projects.slice(offset, offset + limit),
+        items: db.projects.slice(offset, offset + limit).map((p) => projectView(db, p)),
         total: db.projects.length,
         limit,
         offset,
       });
     }),
     http.post('/api/v1/projects', async ({ request }) => {
-      const body = (await request.json()) as { name: string; description: string | null };
+      const body = (await request.json()) as {
+        name: string;
+        description: string | null;
+        color?: string | null;
+        icon?: string | null;
+      };
       log(request, body);
-      return HttpResponse.json(addProject(db, { name: body.name, description: body.description }), {
-        status: 201,
+      const color = body.color
+        ? normalizeProjectColor(body.color)
+        : PROJECT_COLORS[db.projects.length % PROJECT_COLORS.length];
+      if (!color) return invalidColor();
+      const project = addProject(db, {
+        name: body.name,
+        description: body.description,
+        color,
+        icon: body.icon?.trim() || null,
       });
+      return HttpResponse.json(projectView(db, project), { status: 201 });
     }),
     http.get('/api/v1/projects/:projectId', ({ request, params }) => {
       log(request);
@@ -212,7 +240,7 @@ export function backendHandlers(db: Db) {
       if (!project) return notFound();
       const include = new URL(request.url).searchParams.getAll('include');
       return HttpResponse.json({
-        ...project,
+        ...projectView(db, project),
         sources: include.includes('sources')
           ? db.sources
               .filter((s) => s.project_id === project.id && s.scope === 'project')
@@ -226,12 +254,18 @@ export function backendHandlers(db: Db) {
       });
     }),
     http.patch('/api/v1/projects/:projectId', async ({ request, params }) => {
-      const body = (await request.json()) as { name?: string };
+      const body = (await request.json()) as { name?: string; color?: string; icon?: string };
       log(request, body);
       const project = db.projects.find((p) => p.id === params.projectId);
       if (!project) return notFound();
+      if (body.color !== undefined) {
+        const color = normalizeProjectColor(body.color);
+        if (!color) return invalidColor();
+        project.color = color;
+      }
       if (body.name) project.name = body.name;
-      return HttpResponse.json(project);
+      if (body.icon !== undefined) project.icon = body.icon.trim() || null;
+      return HttpResponse.json(projectView(db, project));
     }),
     http.delete('/api/v1/projects/:projectId', ({ request, params }) => {
       log(request);

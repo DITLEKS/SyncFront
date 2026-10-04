@@ -1,4 +1,13 @@
-import { ChevronRight, FileUp, Library, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  ChevronRight,
+  FileUp,
+  Library,
+  MoreHorizontal,
+  Palette,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
@@ -16,6 +25,7 @@ import { ProjectDocumentsList, UploadDocumentDialog } from '@/features/documents
 import {
   DeleteProjectDialog,
   ProjectIcon,
+  ProjectAppearanceDialog,
   RenameProjectDialog,
   useProjectDetail,
 } from '@/features/projects';
@@ -32,6 +42,7 @@ export function ProjectPage() {
   const [uploading, setUploading] = useState(false);
   const [addingSource, setAddingSource] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const [styling, setStyling] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   if (project.isPending) {
@@ -54,8 +65,7 @@ export function ProjectPage() {
   const data = project.data;
   const documents = data.documents ?? [];
   const sources = data.sources ?? [];
-  // Сервер пока отдаёт document_count = 0, поэтому считаем по присланному списку.
-  const documentCount = Math.max(data.document_count, documents.length);
+  const documentCount = data.document_count;
   const uploadButton = (
     <Button onClick={() => setUploading(true)}>
       <FileUp aria-hidden />
@@ -104,6 +114,10 @@ export function ProjectPage() {
               <DropdownMenuItem onSelect={() => setRenaming(true)}>
                 <Pencil aria-hidden />
                 Переименовать
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setStyling(true)}>
+                <Palette aria-hidden />
+                Оформление
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
@@ -194,6 +208,7 @@ export function ProjectPage() {
 
       <UploadDocumentDialog open={uploading} onOpenChange={setUploading} projectId={projectId} />
       <RenameProjectDialog project={renaming ? data : null} onOpenChange={setRenaming} />
+      <ProjectAppearanceDialog project={styling ? data : null} onOpenChange={setStyling} />
       <DeleteProjectDialog
         project={deleting ? data : null}
         onOpenChange={setDeleting}

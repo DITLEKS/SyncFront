@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import {
+  type ProjectIcon as ProjectIconValue,
   type ProjectIconName,
   projectColor,
   resolveProjectIcon,
@@ -41,21 +42,21 @@ interface ProjectIconProps {
   className?: string;
 }
 
+export function ProjectIconGlyph({ icon }: { icon: ProjectIconValue }) {
+  if (icon.kind === 'emoji') return <span className="text-lg leading-none">{icon.value}</span>;
+  const Icon = icon.kind === 'lucide' ? ICONS[icon.name] : FolderKanban;
+  return <Icon aria-hidden className="size-5" />;
+}
+
 export function ProjectIcon({ project, className }: ProjectIconProps) {
   const color = projectColor(project);
-  const icon = resolveProjectIcon(project.icon);
-  const Icon = icon.kind === 'lucide' ? ICONS[icon.name] : FolderKanban;
   return (
     <span
       aria-hidden
       className={cn('flex size-10 shrink-0 items-center justify-center rounded-lg', className)}
       style={{ backgroundColor: `${color}1A`, color }}
     >
-      {icon.kind === 'emoji' ? (
-        <span className="text-lg leading-none">{icon.value}</span>
-      ) : (
-        <Icon className="size-5" />
-      )}
+      <ProjectIconGlyph icon={resolveProjectIcon(project.icon)} />
     </span>
   );
 }

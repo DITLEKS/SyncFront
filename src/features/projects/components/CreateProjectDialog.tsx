@@ -18,12 +18,16 @@ import {
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { PROJECT_COLORS } from '@/domain/project/appearance';
 import type { SourceDraft } from '@/domain/source/sourceDraft';
 import { createSourcesFromDrafts, SourceDraftForm, SourceTypeIcon } from '@/features/sources';
 import { getErrorMessage } from '@/lib/errors';
 
 import { useCreateProject } from '../hooks/useProjects';
 import { projectFormSchema, type ProjectFormValues } from '../model/schemas';
+import { type ProjectAppearance, ProjectAppearancePicker } from './ProjectAppearancePicker';
+
+const AUTO_APPEARANCE: ProjectAppearance = { color: null, icon: null };
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -40,6 +44,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const create = useCreateProject();
   const [drafts, setDrafts] = useState<SourceDraft[]>([]);
   const [savingSources, setSavingSources] = useState(false);
+  const [appearance, setAppearance] = useState<ProjectAppearance>(AUTO_APPEARANCE);
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectFormSchema),
     defaultValues: { name: '', description: '' },
@@ -53,6 +58,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     if (!next) {
       form.reset();
       setDrafts([]);
+      setAppearance(AUTO_APPEARANCE);
       create.reset();
     }
     onOpenChange(next);
@@ -61,7 +67,12 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const submit = form.handleSubmit(async ({ name, description }) => {
     let projectId: string;
     try {
-      const project = await create.mutateAsync({ name, description: description || null });
+      const project = await create.mutateAsync({
+        name,
+        description: description || null,
+        color: appearance.color,
+        icon: appearance.icon,
+      });
       projectId = project.id;
     } catch {
       return;
@@ -85,6 +96,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
 
     form.reset();
     setDrafts([]);
+    setAppearance(AUTO_APPEARANCE);
     create.reset();
     onOpenChange(false);
     navigate(`/projects/${projectId}`);
@@ -110,6 +122,24 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
           >
             <Textarea rows={2} maxLength={2000} disabled={busy} {...form.register('description')} />
           </FormField>
+
+          <section aria-labelledby="create-project-appearance" className="space-y-3">
+            <div>
+              <h3 id="create-project-appearance" className="text-sm font-medium">
+                Оформление
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Необязательно. Без выбора цвет подберётся так, чтобы соседние карточки отличались.
+              </p>
+            </div>
+            <ProjectAppearancePicker
+              value={appearance}
+              onChange={setAppearance}
+              allowAutoColor
+              previewColor={`#${PROJECT_COLORS[0]}`}
+              disabled={busy}
+            />
+          </section>
 
           <section aria-labelledby="create-project-sources" className="space-y-3">
             <div>

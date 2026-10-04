@@ -1,4 +1,4 @@
-import { ArrowRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRight, MoreHorizontal, Palette, Pencil, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import type { ProjectResponse } from '@/api/types';
@@ -16,6 +16,7 @@ import { ProjectIcon } from './ProjectIcon';
 interface ProjectCardProps {
   project: ProjectResponse;
   onRename: (project: ProjectResponse) => void;
+  onEditAppearance: (project: ProjectResponse) => void;
   onDelete: (project: ProjectResponse) => void;
 }
 
@@ -23,7 +24,7 @@ interface ProjectCardProps {
  * Вся карточка — ссылка на проект; меню лежит поверх ссылки отдельным элементом,
  * поэтому клик по нему не открывает проект. Меню видно при наведении и при фокусе с клавиатуры.
  */
-export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
+export function ProjectCard({ project, onRename, onEditAppearance, onDelete }: ProjectCardProps) {
   const documents = project.document_count;
   const sources = project.source_count;
   return (
@@ -81,6 +82,10 @@ export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
             <DropdownMenuItem onSelect={() => onRename(project)}>
               <Pencil aria-hidden />
               Переименовать
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onEditAppearance(project)}>
+              <Palette aria-hidden />
+              Оформление
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"

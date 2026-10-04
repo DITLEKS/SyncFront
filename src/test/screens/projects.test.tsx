@@ -4,7 +4,14 @@ import { HttpResponse, http } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { DELETE_PROJECT_TEXT } from '@/features/projects';
-import { addProject, backendHandlers, createDb, type Db } from '@/test/msw/backend';
+import {
+  addDocument,
+  addProject,
+  addSource,
+  backendHandlers,
+  createDb,
+  type Db,
+} from '@/test/msw/backend';
 import { server } from '@/test/msw/server';
 import { renderWithApp } from '@/test/render';
 
@@ -138,5 +145,89 @@ describe('Раздел «Проекты»', () => {
     expect(within(dialog).getByText(DELETE_PROJECT_TEXT)).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Удалить' }));
     expect(await screen.findByText('Пока нет проектов')).toBeInTheDocument();
+  });
+
+  it('показывает реальные счётчики документов и базовых источников', async () => {
+    const project = addProject(db, { name: 'Счётчики' });
+    const doc = addDocument(db, project.id);
+    addDocument(db, project.id, { name: 'second.md' });
+    addSource(db, project.id);
+    addSource(db, project.id, { scope: 'document', documentId: doc.id });
+    renderProjects();
+    const card = (await screen.findByRole('link', { name: 'Счётчики' })).closest('article');
+    expect(card).not.toBeNull();
+    expect(within(card as HTMLElement).getByText('2 документа')).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByText('1 источник')).toBeInTheDocument();
+  });
+
+  it('создаёт проект с выбранным цветом и иконкой, без выбора цвет оставляет серверу', async () => {
+    const user = userEvent.setup();
+    renderProjects();
+    await user.click(await screen.findByRole('button', { name: 'Новый проект' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Новый проект' });
+    const colors = within(dialog).getByRole('radiogroup', { name: 'Цвет' });
+    expect(within(colors).getByRole('radio', { name: 'Автоматически' })).toBeChecked();
+    expect(
+      within(within(dialog).getByRole('radiogroup', { name: 'Иконка' })).getByRole('radio', {
+        name: 'По умолчанию',
+      }),
+    ).toBeChecked();
+
+    await user.type(within(dialog).getByLabelText('Название проекта'), 'Цветной');
+    await user.click(within(colors).getByRole('radio', { name: 'Розовый' }));
+    await user.click(within(dialog).getByRole('radio', { name: 'Ракета' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Создать проект' }));
+
+    await waitFor(() =>
+      expect(
+        db.requests.find((r) => r.method === 'POST' && r.path === '/api/v1/projects')?.body,
+      ).toEqual({ name: 'Цветной', description: null, color: 'EC4899', icon: 'rocket' }),
+    );
+    expect(db.projects[0]).toMatchObject({ color: 'EC4899', icon: 'rocket' });
+  });
+
+  it('меняет оформление из меню карточки и сбрасывает иконку пустой строкой', async () => {
+    addProject(db, { name: 'Оформляемый', color: '3B82F6', icon: 'rocket' });
+    const user = userEvent.setup();
+    renderProjects();
+    await user.click(
+      await screen.findByRole('button', { name: 'Действия с проектом Оформляемый' }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Оформление' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Оформление проекта' });
+    const save = within(dialog).getByRole('button', { name: 'Сохранить' });
+    expect(save).toBeDisabled();
+    expect(within(dialog).queryByRole('radio', { name: 'Автоматически' })).toBeNull();
+
+    const blue = within(dialog).getByRole('radio', { name: 'Синий' });
+    expect(blue).toBeChecked();
+    blue.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(within(dialog).getByRole('radio', { name: 'Фиолетовый' })).toHaveFocus();
+    expect(within(dialog).getByRole('radio', { name: 'Фиолетовый' })).toBeChecked();
+    await user.click(within(dialog).getByRole('radio', { name: 'По умолчанию' }));
+    await user.click(save);
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const patch = db.requests.find((r) => r.method === 'PATCH');
+    expect(patch?.body).toEqual({ color: '8B5CF6', icon: '' });
+    expect(db.projects[0]).toMatchObject({ color: '8B5CF6', icon: null });
+  });
+
+  it('оставляет окно оформления открытым с ошибкой сервера', async () => {
+    const project = addProject(db, { name: 'Ошибочный', color: '3B82F6' });
+    server.use(
+      http.patch(`/api/v1/projects/${project.id}`, () =>
+        HttpResponse.json({ detail: 'Недопустимый цвет проекта' }, { status: 422 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderProjects();
+    await user.click(await screen.findByRole('button', { name: 'Действия с проектом Ошибочный' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Оформление' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Оформление проекта' });
+    await user.click(within(dialog).getByRole('radio', { name: 'Красный' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
+    expect(await within(dialog).findByText('Недопустимый цвет проекта')).toBeInTheDocument();
   });
 });

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { PROJECT_COLORS, projectColor, resolveProjectIcon } from './appearance';
+import {
+  normalizeProjectColor,
+  PROJECT_COLORS,
+  projectColor,
+  resolveProjectIcon,
+} from './appearance';
 
 describe('projectColor', () => {
   it('берёт цвет сервера, если он валиден', () => {
@@ -13,8 +18,21 @@ describe('projectColor', () => {
     expect(PROJECT_COLORS.map((c) => `#${c}`)).toContain(first);
   });
 
-  it('игнорирует невалидный hex', () => {
+  it('игнорирует цвет вне палитры', () => {
     expect(projectColor({ id: 'x', color: 'red' })).toMatch(/^#[0-9A-F]{6}$/);
+    expect(projectColor({ id: 'x', color: '123456' })).not.toBe('#123456');
+  });
+});
+
+describe('normalizeProjectColor', () => {
+  it.each([
+    ['#ec4899', 'EC4899'],
+    [' 3b82f6 ', '3B82F6'],
+    ['123456', null],
+    ['', null],
+    [null, null],
+  ])('%s → %s', (input, expected) => {
+    expect(normalizeProjectColor(input)).toBe(expected);
   });
 });
 
