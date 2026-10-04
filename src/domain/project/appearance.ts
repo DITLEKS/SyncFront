@@ -1,5 +1,6 @@
 /**
- * Внешний вид карточки проекта. Цвет только различает проекты и не несёт статуса.
+ * Внешний вид карточки проекта. Цвет и иконку задаёт сервер, в MVP пользователь их не меняет.
+ * Цвет только различает проекты и не несёт статуса.
  * Палитра совпадает с PROJECT_COLORS бэкенда (app/domain/project_appearance.py):
  * цвет вне её сервер отклоняет с 422.
  */
@@ -16,17 +17,6 @@ export const PROJECT_COLORS = [
 ] as const;
 
 export type ProjectColor = (typeof PROJECT_COLORS)[number];
-
-export const PROJECT_COLOR_LABELS: Record<ProjectColor, string> = {
-  '3B82F6': 'Синий',
-  '8B5CF6': 'Фиолетовый',
-  '10B981': 'Изумрудный',
-  F59E0B: 'Янтарный',
-  EF4444: 'Красный',
-  EC4899: 'Розовый',
-  '14B8A6': 'Бирюзовый',
-  F97316: 'Оранжевый',
-};
 
 /** Цвет из палитры в каноническом виде (без '#', верхний регистр) или null. */
 export function normalizeProjectColor(value: string | null | undefined): ProjectColor | null {
@@ -74,21 +64,6 @@ export const PROJECT_ICON_NAMES = [
 ] as const;
 
 export type ProjectIconName = (typeof PROJECT_ICON_NAMES)[number];
-
-export const PROJECT_ICON_LABELS: Record<ProjectIconName, string> = {
-  'folder-kanban': 'Папка',
-  'book-open': 'Книга',
-  'file-code': 'Код',
-  server: 'Сервер',
-  shield: 'Щит',
-  rocket: 'Ракета',
-  boxes: 'Модули',
-  cloud: 'Облако',
-  database: 'База данных',
-  workflow: 'Процесс',
-  globe: 'Глобус',
-  cpu: 'Процессор',
-};
 
 export type ProjectIcon =
   | { kind: 'lucide'; name: ProjectIconName }

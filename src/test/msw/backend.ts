@@ -1,7 +1,7 @@
 /**
  * Небольшой бэкенд в памяти для интеграционных тестов экранов проектов и документов.
  * Повторяет контракт SyncBack: счётчики проекта считаются по документам и базовым источникам,
- * цвет — из палитры (иначе 422), вложенный detail у 409 confirmation_required.
+ * цвет назначается по кругу палитры, вложенный detail у 409 confirmation_required.
  * analysis в списках не заполняется — так проверяется запасной путь через задачу анализа.
  */
 import { HttpResponse, http } from 'msw';
@@ -14,7 +14,7 @@ import type {
   SourceResponse,
 } from '@/api/types';
 import type { DocumentStatus } from '@/domain/document/status';
-import { normalizeProjectColor, PROJECT_COLORS } from '@/domain/project/appearance';
+import { PROJECT_COLORS } from '@/domain/project/appearance';
 
 import { TEST_USER } from './handlers';
 
@@ -78,9 +78,6 @@ function projectView(db: Db, project: ProjectResponse): ProjectResponse {
       .length,
   };
 }
-
-const invalidColor = () =>
-  HttpResponse.json({ detail: 'Недопустимый цвет проекта' }, { status: 422 });
 
 export function addDocument(
   db: Db,
@@ -215,22 +212,12 @@ export function backendHandlers(db: Db) {
       });
     }),
     http.post('/api/v1/projects', async ({ request }) => {
-      const body = (await request.json()) as {
-        name: string;
-        description: string | null;
-        color?: string | null;
-        icon?: string | null;
-      };
+      const body = (await request.json()) as { name: string; description: string | null };
       log(request, body);
-      const color = body.color
-        ? normalizeProjectColor(body.color)
-        : PROJECT_COLORS[db.projects.length % PROJECT_COLORS.length];
-      if (!color) return invalidColor();
       const project = addProject(db, {
         name: body.name,
         description: body.description,
-        color,
-        icon: body.icon?.trim() || null,
+        color: PROJECT_COLORS[db.projects.length % PROJECT_COLORS.length],
       });
       return HttpResponse.json(projectView(db, project), { status: 201 });
     }),
@@ -254,17 +241,11 @@ export function backendHandlers(db: Db) {
       });
     }),
     http.patch('/api/v1/projects/:projectId', async ({ request, params }) => {
-      const body = (await request.json()) as { name?: string; color?: string; icon?: string };
+      const body = (await request.json()) as { name?: string };
       log(request, body);
       const project = db.projects.find((p) => p.id === params.projectId);
       if (!project) return notFound();
-      if (body.color !== undefined) {
-        const color = normalizeProjectColor(body.color);
-        if (!color) return invalidColor();
-        project.color = color;
-      }
       if (body.name) project.name = body.name;
-      if (body.icon !== undefined) project.icon = body.icon.trim() || null;
       return HttpResponse.json(projectView(db, project));
     }),
     http.delete('/api/v1/projects/:projectId', ({ request, params }) => {

@@ -121,7 +121,12 @@ describe('Раздел «Проекты»', () => {
     const user = userEvent.setup();
     const { router } = renderProjects();
     await user.click(await screen.findByRole('button', { name: 'Действия с проектом Старое имя' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Переименовать' }));
+    // В MVP оформление задаёт сервер: в меню только действия из описания UI.
+    expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual([
+      'Переименовать',
+      'Удалить',
+    ]);
+    await user.click(screen.getByRole('menuitem', { name: 'Переименовать' }));
     expect(router.state.location.pathname).toBe('/projects');
 
     const dialog = await screen.findByRole('dialog', { name: 'Переименовать проект' });
@@ -147,8 +152,8 @@ describe('Раздел «Проекты»', () => {
     expect(await screen.findByText('Пока нет проектов')).toBeInTheDocument();
   });
 
-  it('показывает реальные счётчики документов и базовых источников', async () => {
-    const project = addProject(db, { name: 'Счётчики' });
+  it('показывает цвет, иконку и счётчики так, как прислал сервер', async () => {
+    const project = addProject(db, { name: 'Счётчики', color: 'EC4899', icon: 'rocket' });
     const doc = addDocument(db, project.id);
     addDocument(db, project.id, { name: 'second.md' });
     addSource(db, project.id);
@@ -156,78 +161,24 @@ describe('Раздел «Проекты»', () => {
     renderProjects();
     const card = (await screen.findByRole('link', { name: 'Счётчики' })).closest('article');
     expect(card).not.toBeNull();
-    expect(within(card as HTMLElement).getByText('2 документа')).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByText('1 источник')).toBeInTheDocument();
+    const scope = within(card as HTMLElement);
+    expect(scope.getByText('2 документа')).toBeInTheDocument();
+    expect(scope.getByText('1 источник')).toBeInTheDocument();
+    expect((card as HTMLElement).querySelector('[style]')).toHaveStyle({ color: '#EC4899' });
   });
 
-  it('создаёт проект с выбранным цветом и иконкой, без выбора цвет оставляет серверу', async () => {
+  it('не отправляет цвет и иконку при создании проекта', async () => {
     const user = userEvent.setup();
     renderProjects();
     await user.click(await screen.findByRole('button', { name: 'Новый проект' }));
     const dialog = await screen.findByRole('dialog', { name: 'Новый проект' });
-    const colors = within(dialog).getByRole('radiogroup', { name: 'Цвет' });
-    expect(within(colors).getByRole('radio', { name: 'Автоматически' })).toBeChecked();
-    expect(
-      within(within(dialog).getByRole('radiogroup', { name: 'Иконка' })).getByRole('radio', {
-        name: 'По умолчанию',
-      }),
-    ).toBeChecked();
-
-    await user.type(within(dialog).getByLabelText('Название проекта'), 'Цветной');
-    await user.click(within(colors).getByRole('radio', { name: 'Розовый' }));
-    await user.click(within(dialog).getByRole('radio', { name: 'Ракета' }));
+    expect(within(dialog).queryByRole('radiogroup')).toBeNull();
+    await user.type(within(dialog).getByLabelText('Название проекта'), 'Без оформления');
     await user.click(within(dialog).getByRole('button', { name: 'Создать проект' }));
-
     await waitFor(() =>
       expect(
         db.requests.find((r) => r.method === 'POST' && r.path === '/api/v1/projects')?.body,
-      ).toEqual({ name: 'Цветной', description: null, color: 'EC4899', icon: 'rocket' }),
+      ).toEqual({ name: 'Без оформления', description: null }),
     );
-    expect(db.projects[0]).toMatchObject({ color: 'EC4899', icon: 'rocket' });
-  });
-
-  it('меняет оформление из меню карточки и сбрасывает иконку пустой строкой', async () => {
-    addProject(db, { name: 'Оформляемый', color: '3B82F6', icon: 'rocket' });
-    const user = userEvent.setup();
-    renderProjects();
-    await user.click(
-      await screen.findByRole('button', { name: 'Действия с проектом Оформляемый' }),
-    );
-    await user.click(await screen.findByRole('menuitem', { name: 'Оформление' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Оформление проекта' });
-    const save = within(dialog).getByRole('button', { name: 'Сохранить' });
-    expect(save).toBeDisabled();
-    expect(within(dialog).queryByRole('radio', { name: 'Автоматически' })).toBeNull();
-
-    const blue = within(dialog).getByRole('radio', { name: 'Синий' });
-    expect(blue).toBeChecked();
-    blue.focus();
-    await user.keyboard('{ArrowRight}');
-    expect(within(dialog).getByRole('radio', { name: 'Фиолетовый' })).toHaveFocus();
-    expect(within(dialog).getByRole('radio', { name: 'Фиолетовый' })).toBeChecked();
-    await user.click(within(dialog).getByRole('radio', { name: 'По умолчанию' }));
-    await user.click(save);
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    const patch = db.requests.find((r) => r.method === 'PATCH');
-    expect(patch?.body).toEqual({ color: '8B5CF6', icon: '' });
-    expect(db.projects[0]).toMatchObject({ color: '8B5CF6', icon: null });
-  });
-
-  it('оставляет окно оформления открытым с ошибкой сервера', async () => {
-    const project = addProject(db, { name: 'Ошибочный', color: '3B82F6' });
-    server.use(
-      http.patch(`/api/v1/projects/${project.id}`, () =>
-        HttpResponse.json({ detail: 'Недопустимый цвет проекта' }, { status: 422 }),
-      ),
-    );
-    const user = userEvent.setup();
-    renderProjects();
-    await user.click(await screen.findByRole('button', { name: 'Действия с проектом Ошибочный' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Оформление' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Оформление проекта' });
-    await user.click(within(dialog).getByRole('radio', { name: 'Красный' }));
-    await user.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
-    expect(await within(dialog).findByText('Недопустимый цвет проекта')).toBeInTheDocument();
   });
 });
