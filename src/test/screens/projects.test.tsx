@@ -4,7 +4,14 @@ import { HttpResponse, http } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { DELETE_PROJECT_TEXT } from '@/features/projects';
-import { addProject, backendHandlers, createDb, type Db } from '@/test/msw/backend';
+import {
+  addDocument,
+  addProject,
+  addSource,
+  backendHandlers,
+  createDb,
+  type Db,
+} from '@/test/msw/backend';
 import { server } from '@/test/msw/server';
 import { renderWithApp } from '@/test/render';
 
@@ -114,7 +121,12 @@ describe('Раздел «Проекты»', () => {
     const user = userEvent.setup();
     const { router } = renderProjects();
     await user.click(await screen.findByRole('button', { name: 'Действия с проектом Старое имя' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'Переименовать' }));
+    // В MVP оформление задаёт сервер: в меню только действия из описания UI.
+    expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual([
+      'Переименовать',
+      'Удалить',
+    ]);
+    await user.click(screen.getByRole('menuitem', { name: 'Переименовать' }));
     expect(router.state.location.pathname).toBe('/projects');
 
     const dialog = await screen.findByRole('dialog', { name: 'Переименовать проект' });
@@ -138,5 +150,35 @@ describe('Раздел «Проекты»', () => {
     expect(within(dialog).getByText(DELETE_PROJECT_TEXT)).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Удалить' }));
     expect(await screen.findByText('Пока нет проектов')).toBeInTheDocument();
+  });
+
+  it('показывает цвет, иконку и счётчики так, как прислал сервер', async () => {
+    const project = addProject(db, { name: 'Счётчики', color: 'EC4899', icon: 'rocket' });
+    const doc = addDocument(db, project.id);
+    addDocument(db, project.id, { name: 'second.md' });
+    addSource(db, project.id);
+    addSource(db, project.id, { scope: 'document', documentId: doc.id });
+    renderProjects();
+    const card = (await screen.findByRole('link', { name: 'Счётчики' })).closest('article');
+    expect(card).not.toBeNull();
+    const scope = within(card as HTMLElement);
+    expect(scope.getByText('2 документа')).toBeInTheDocument();
+    expect(scope.getByText('1 источник')).toBeInTheDocument();
+    expect((card as HTMLElement).querySelector('[style]')).toHaveStyle({ color: '#EC4899' });
+  });
+
+  it('не отправляет цвет и иконку при создании проекта', async () => {
+    const user = userEvent.setup();
+    renderProjects();
+    await user.click(await screen.findByRole('button', { name: 'Новый проект' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Новый проект' });
+    expect(within(dialog).queryByRole('radiogroup')).toBeNull();
+    await user.type(within(dialog).getByLabelText('Название проекта'), 'Без оформления');
+    await user.click(within(dialog).getByRole('button', { name: 'Создать проект' }));
+    await waitFor(() =>
+      expect(
+        db.requests.find((r) => r.method === 'POST' && r.path === '/api/v1/projects')?.body,
+      ).toEqual({ name: 'Без оформления', description: null }),
+    );
   });
 });

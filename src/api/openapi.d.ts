@@ -169,7 +169,7 @@ export interface paths {
         head?: never;
         /**
          * Update Project
-         * @description Частичное обновление проекта (переименование, изменение описания).
+         * @description Частичное обновление проекта: название, описание, цвет, иконка.
          */
         patch: operations["update_project_api_v1_projects__project_id__patch"];
         trace?: never;
@@ -1357,7 +1357,7 @@ export interface components {
             description?: string | null;
             /**
              * Color
-             * @description Hex-цвет карточки без '#' (6 символов). Если не задан — выбирается автоматически.
+             * @description Hex-цвет карточки из палитры PROJECT_COLORS, '#' необязателен. Если не задан — выбирается следующий цвет палитры.
              * @example 3B82F6
              */
             color?: string | null;
@@ -1418,9 +1418,15 @@ export interface components {
             name?: string | null;
             /** Description */
             description?: string | null;
-            /** Color */
+            /**
+             * Color
+             * @description Цвет из палитры
+             */
             color?: string | null;
-            /** Icon */
+            /**
+             * Icon
+             * @description Пустая строка возвращает иконку по умолчанию
+             */
             icon?: string | null;
         };
         /** RecentDocumentItem */

@@ -54,8 +54,7 @@ export function ProjectPage() {
   const data = project.data;
   const documents = data.documents ?? [];
   const sources = data.sources ?? [];
-  // Сервер пока отдаёт document_count = 0, поэтому считаем по присланному списку.
-  const documentCount = Math.max(data.document_count, documents.length);
+  const documentCount = data.document_count;
   const uploadButton = (
     <Button onClick={() => setUploading(true)}>
       <FileUp aria-hidden />

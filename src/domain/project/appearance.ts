@@ -1,6 +1,8 @@
 /**
- * Внешний вид карточки проекта. Цвет только различает проекты и не несёт статуса.
- * Палитра совпадает с PROJECT_COLORS бэкенда (app/api/schemas/project.py).
+ * Внешний вид карточки проекта. Цвет и иконку задаёт сервер, в MVP пользователь их не меняет.
+ * Цвет только различает проекты и не несёт статуса.
+ * Палитра совпадает с PROJECT_COLORS бэкенда (app/domain/project_appearance.py):
+ * цвет вне её сервер отклоняет с 422.
  */
 
 export const PROJECT_COLORS = [
@@ -16,7 +18,13 @@ export const PROJECT_COLORS = [
 
 export type ProjectColor = (typeof PROJECT_COLORS)[number];
 
-const HEX6 = /^[0-9A-Fa-f]{6}$/;
+/** Цвет из палитры в каноническом виде (без '#', верхний регистр) или null. */
+export function normalizeProjectColor(value: string | null | undefined): ProjectColor | null {
+  const color = value?.trim().replace(/^#/, '').toUpperCase();
+  return (PROJECT_COLORS as readonly string[]).includes(color ?? '')
+    ? (color as ProjectColor)
+    : null;
+}
 
 /** Стабильный хеш строки (FNV-1a), чтобы цвет не менялся между перезагрузками. */
 function hash(value: string): number {
@@ -29,11 +37,12 @@ function hash(value: string): number {
 }
 
 /**
- * Цвет проекта: значение сервера, если оно валидно, иначе детерминированный цвет из палитры по id.
- * Сервер пока не сохраняет color, поэтому запасной вариант — основной путь.
+ * Цвет проекта для отображения: сохранённый на сервере, а если его нет (ответ без поля
+ * или устаревшее значение) — стабильный цвет палитры по id, чтобы карточка не была серой.
  */
 export function projectColor(project: { id: string; color?: string | null }): string {
-  if (project.color && HEX6.test(project.color)) return `#${project.color.toUpperCase()}`;
+  const saved = normalizeProjectColor(project.color);
+  if (saved) return `#${saved}`;
   const index = hash(project.id) % PROJECT_COLORS.length;
   return `#${PROJECT_COLORS[index] ?? PROJECT_COLORS[0]}`;
 }

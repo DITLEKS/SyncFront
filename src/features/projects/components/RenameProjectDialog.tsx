@@ -38,12 +38,18 @@ export function RenameProjectDialog({ project, onOpenChange }: RenameProjectDial
   const { reset } = form;
   const resetMutation = rename.reset;
 
+  // Сбрасываем форму только при открытии для другого проекта: страница проекта опрашивает
+  // сервер, и новый объект с тем же id не должен стирать введённое название.
+  const projectId = project?.id;
+  const projectName = project?.name;
   useEffect(() => {
-    if (project) {
-      reset({ name: project.name });
+    if (projectId !== undefined) {
+      reset({ name: projectName ?? '' });
       resetMutation();
     }
-  }, [project, reset, resetMutation]);
+    // projectName намеренно не в зависимостях, см. комментарий выше.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, reset, resetMutation]);
 
   const name = form.watch('name');
   const unchanged = name.trim() === project?.name;
