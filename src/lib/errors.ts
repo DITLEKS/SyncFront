@@ -9,8 +9,20 @@ export interface ValidationIssue {
   type: string;
 }
 
+/**
+ * HTTPException(detail=dict) в FastAPI даёт вложенный объект: так приходит 409
+ * с confirmation_required при повторном анализе.
+ */
+export interface NestedDetail {
+  detail?: string;
+  [extra: string]: unknown;
+}
+
 export type ErrorBody =
-  { detail: string; [extra: string]: unknown } | { detail: ValidationIssue[] } | undefined;
+  | { detail: string; [extra: string]: unknown }
+  | { detail: ValidationIssue[] }
+  | { detail: NestedDetail }
+  | undefined;
 
 export class ApiError extends Error {
   readonly status: number;
@@ -27,7 +39,9 @@ export class ApiError extends Error {
 
   /** Поле ответа вне detail, например confirmation_required у 409 при повторном анализе. */
   extra(key: string): unknown {
-    if (!this.body || Array.isArray(this.body.detail)) return undefined;
+    if (!this.body) return undefined;
+    const { detail } = this.body;
+    if (isNestedDetail(detail) && key in detail) return detail[key];
     return (this.body as Record<string, unknown>)[key];
   }
 }
@@ -40,10 +54,15 @@ function isValidationIssue(value: unknown): value is ValidationIssue {
   return typeof value === 'object' && value !== null && 'msg' in value && 'loc' in value;
 }
 
+function isNestedDetail(value: unknown): value is NestedDetail {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function detailToMessage(body: ErrorBody): string | undefined {
   if (!body) return undefined;
   const { detail } = body;
   if (typeof detail === 'string') return detail;
+  if (isNestedDetail(detail)) return typeof detail.detail === 'string' ? detail.detail : undefined;
   if (Array.isArray(detail)) {
     const lines = detail.filter(isValidationIssue).map((issue) => {
       // Первый элемент loc — body/query/path, пользователю он не нужен.

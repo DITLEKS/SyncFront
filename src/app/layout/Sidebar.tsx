@@ -1,13 +1,14 @@
 import {
-  FileText,
+  ChevronLeft,
+  ChevronRight,
+  FolderOpen,
   FolderKanban,
   LayoutDashboard,
   type LucideIcon,
-  PanelLeftClose,
-  PanelLeftOpen,
   Settings,
+  Sparkles,
 } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useMatch } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -26,7 +27,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Рабочее пространство', icon: LayoutDashboard, end: true },
   { to: '/projects', label: 'Проекты', icon: FolderKanban },
-  { to: '/documents', label: 'Мои документы', icon: FileText },
+  { to: '/documents', label: 'Мои документы', icon: FolderOpen },
 ];
 
 interface SidebarProps {
@@ -38,85 +39,104 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'sticky top-0 flex h-screen shrink-0 flex-col border-r bg-card transition-[width] duration-200 ease-out',
-        collapsed ? 'w-16' : 'w-64',
+        'sticky top-0 z-20 flex h-dvh shrink-0 flex-col border-r bg-card shadow-sm transition-[width] duration-300 ease-in-out motion-reduce:transition-none',
+        collapsed ? 'w-20' : 'w-20 md:w-64',
       )}
       aria-label="Основная навигация"
     >
-      <div className={cn('flex h-16 items-center gap-3 px-3', collapsed && 'justify-center')}>
-        <BrandMark className="size-9 shrink-0" />
+      <Button
+        variant="outline"
+        size="icon"
+        className="absolute -right-3 top-6 hidden size-6 rounded-full bg-card p-1 text-muted-foreground md:inline-flex"
+        onClick={onToggle}
+        aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+        aria-expanded={!collapsed}
+        aria-controls="sidebar-navigation"
+      >
+        {collapsed ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
+      </Button>
+      <div
+        className={cn(
+          'flex h-16 shrink-0 items-center justify-center gap-3 border-b px-4',
+          !collapsed && 'md:justify-start',
+        )}
+      >
+        <BrandMark className="size-8 shrink-0" />
         {!collapsed ? (
-          <div className="min-w-0">
-            <p className="truncate font-semibold leading-tight">SyncScribe</p>
-            <p className="truncate text-xs text-muted-foreground">Актуальная документация</p>
+          <div className="hidden min-w-0 items-center gap-1.5 md:flex">
+            <p className="truncate text-base font-bold tracking-tight">SyncScribe</p>
+            <Sparkles className="size-3.5 shrink-0 text-indigo-400" aria-hidden />
           </div>
         ) : null}
       </div>
 
-      <nav className="flex-1 space-y-1 px-2 py-2">
+      <div className="shrink-0 px-6 pb-2 pt-6">
+        <span
+          className={cn(
+            'block h-4 text-xs font-bold uppercase tracking-wider text-muted-foreground',
+            collapsed ? 'invisible' : 'invisible md:visible',
+          )}
+        >
+          Навигация
+        </span>
+      </div>
+      <nav id="sidebar-navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3">
         {NAV_ITEMS.map((item) => (
           <SidebarLink key={item.to} item={item} collapsed={collapsed} />
         ))}
       </nav>
 
-      <div className="space-y-1 border-t p-2">
+      <div className="shrink-0 space-y-1 border-t bg-muted/30 p-3">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
-              className={cn('w-full justify-start gap-3', collapsed && 'justify-center px-0')}
+              className={cn(
+                'h-12 w-full justify-center gap-3 rounded-xl px-0 [&_svg]:size-5',
+                !collapsed && 'md:h-10 md:justify-start md:px-3',
+              )}
               disabled
               aria-label="Настройки"
             >
               <Settings />
-              {!collapsed ? <span>Настройки</span> : null}
+              {!collapsed ? <span className="hidden md:inline">Настройки</span> : null}
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right">Настройки появятся позже</TooltipContent>
         </Tooltip>
 
         <AccountMenu collapsed={collapsed} />
-
-        <Button
-          variant="ghost"
-          size={collapsed ? 'icon' : 'default'}
-          className={cn(
-            'w-full justify-start gap-3 text-muted-foreground',
-            collapsed && 'justify-center',
-          )}
-          onClick={onToggle}
-          aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
-          aria-expanded={!collapsed}
-        >
-          {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
-          {!collapsed ? <span>Свернуть</span> : null}
-        </Button>
       </div>
     </aside>
   );
 }
 
 function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+  // Radix Slot ожидает строковый className, а не render-prop NavLink.
+  const isActive = useMatch({ path: item.to, end: item.end ?? false }) !== null;
   const link = (
     <NavLink
       to={item.to}
       end={item.end}
-      className={({ isActive }) =>
-        cn(
-          'flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors',
-          'hover:bg-accent hover:text-accent-foreground',
-          isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground',
-          collapsed && 'justify-center px-0',
-        )
-      }
-      aria-label={collapsed ? item.label : undefined}
+      className={cn(
+        'group mx-auto flex h-12 w-12 items-center justify-center gap-3 rounded-xl text-sm font-medium transition-colors duration-200 motion-reduce:transition-none',
+        'hover:bg-muted hover:text-foreground',
+        isActive ? 'bg-accent font-semibold text-accent-foreground' : 'text-muted-foreground',
+        !collapsed && 'md:h-10 md:w-full md:justify-start md:px-3',
+      )}
+      aria-label={item.label}
     >
-      <item.icon className="size-4 shrink-0" aria-hidden />
-      {!collapsed ? <span className="truncate">{item.label}</span> : null}
+      <item.icon className="size-5 shrink-0" strokeWidth={isActive ? 2.5 : 2} aria-hidden />
+      {!collapsed ? <span className="hidden truncate md:inline">{item.label}</span> : null}
+      {isActive && !collapsed ? (
+        <span
+          className="ml-auto hidden size-1.5 shrink-0 rounded-full bg-primary md:block"
+          aria-hidden
+        />
+      ) : null}
     </NavLink>
   );
 
-  if (!collapsed) return link;
   return (
     <Tooltip>
       <TooltipTrigger asChild>{link}</TooltipTrigger>

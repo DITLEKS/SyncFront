@@ -1,0 +1,79 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { queryKeys } from '@/api/queryKeys';
+import { getAnalysisJob, startAnalysis, startBulkAnalysis } from '@/api/resources/analysis';
+import type { AnalysisState } from '@/api/types';
+import {
+  analysisStateFromContract,
+  analysisStateFromJob,
+  type AnalysisStateView,
+  isTerminalJobStatus,
+  needsJobLookup,
+} from '@/domain/analysis/analysisState';
+import type { DocumentStatus } from '@/domain/document/status';
+import { isApiError } from '@/lib/errors';
+import { uuidV4 } from '@/lib/id';
+
+export function useInvalidateAfterAnalysis() {
+  const queryClient = useQueryClient();
+  return (projectId: string) =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all }),
+    ]);
+}
+
+/** 409 с confirmation_required: документ в ready, нужен повтор с force=true. */
+export function isConfirmationRequired(error: unknown): boolean {
+  return isApiError(error) && error.status === 409 && error.extra('confirmation_required') === true;
+}
+
+export function useStartAnalysis(projectId: string) {
+  const invalidate = useInvalidateAfterAnalysis();
+  return useMutation({
+    // Новый ключ на каждый клик: повтор того же клика (ретрай сети) вернёт ту же задачу.
+    mutationFn: ({ documentId, force }: { documentId: string; force: boolean }) =>
+      startAnalysis({ projectId, documentId, force, idempotencyKey: uuidV4() }),
+    onSettled: () => invalidate(projectId),
+  });
+}
+
+export function useBulkAnalysis(projectId: string) {
+  const invalidate = useInvalidateAfterAnalysis();
+  return useMutation({
+    mutationFn: ({ documentIds, force }: { documentIds: string[]; force: boolean }) =>
+      startBulkAnalysis(projectId, { document_ids: documentIds, force }),
+    onSettled: () => invalidate(projectId),
+  });
+}
+
+interface DocumentForAnalysis {
+  id: string;
+  status: DocumentStatus;
+  current_analysis_job_id?: string | null;
+  analysis?: AnalysisState | null;
+}
+
+/**
+ * Состояние анализа документа: из поля analysis, а если сервер его не прислал —
+ * из текущей задачи. Завершённые задачи не меняются, поэтому кешируются навсегда.
+ */
+export function useAnalysisState(
+  projectId: string,
+  document: DocumentForAnalysis,
+): AnalysisStateView | null {
+  const jobId = document.current_analysis_job_id ?? '';
+  const lookup = needsJobLookup(document);
+  const job = useQuery({
+    queryKey: queryKeys.analysisJobs.detail(projectId, document.id, jobId),
+    queryFn: () => getAnalysisJob(projectId, document.id, jobId),
+    enabled: lookup,
+    staleTime: (query) =>
+      query.state.data && isTerminalJobStatus(query.state.data.status) ? Infinity : 0,
+  });
+
+  if (document.analysis) return analysisStateFromContract(document.analysis);
+  if (lookup && job.data) return analysisStateFromJob(job.data);
+  return null;
+}

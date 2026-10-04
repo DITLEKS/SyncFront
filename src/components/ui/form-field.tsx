@@ -5,7 +5,8 @@ import { cn } from '@/lib/cn';
 import { Label } from './label';
 
 interface FormFieldProps {
-  id: string;
+  /** Без id используется сгенерированный useId. */
+  id?: string;
   label: string;
   error?: string;
   hint?: string;
@@ -17,7 +18,16 @@ interface FormFieldProps {
  * Поле формы: подпись, контрол, подсказка и ошибка, связанные через aria-атрибуты.
  * Контрол получает id, aria-invalid и aria-describedby автоматически.
  */
-export function FormField({ id, label, error, hint, children, className }: FormFieldProps) {
+export function FormField({
+  id: explicitId,
+  label,
+  error,
+  hint,
+  children,
+  className,
+}: FormFieldProps) {
+  const generatedId = React.useId();
+  const id = explicitId ?? generatedId;
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
   const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ');

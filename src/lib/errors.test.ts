@@ -37,4 +37,14 @@ describe('getErrorMessage', () => {
     const error = new ApiError(409, { detail: 'x', confirmation_required: true }, new Headers());
     expect(error.extra('confirmation_required')).toBe(true);
   });
+
+  it('разбирает вложенный detail от HTTPException(detail=dict)', () => {
+    const error = new ApiError(
+      409,
+      { detail: { detail: 'Документ уже проверен', confirmation_required: true } },
+      new Headers(),
+    );
+    expect(getErrorMessage(error)).toBe('Документ уже проверен');
+    expect(error.extra('confirmation_required')).toBe(true);
+  });
 });

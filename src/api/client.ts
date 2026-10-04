@@ -71,11 +71,26 @@ export function ok<T>(result: FetchResult<T>): T {
   return data as T;
 }
 
-/** Сериализатор тела для multipart-запросов: openapi-fetch отдаёт FormData как есть. */
-export function multipart(body: Record<string, string | Blob | undefined>): FormData {
-  const form = new FormData();
-  for (const [key, value] of Object.entries(body)) {
-    if (value !== undefined) form.append(key, value);
-  }
-  return form;
+type MultipartValue = string | Blob | null | undefined;
+
+/**
+ * Опции multipart-запроса для openapi-fetch. В OpenAPI бинарное поле описано как string,
+ * поэтому тело типизируем по схеме, а File подставляем при сериализации.
+ * Content-Type не задаём: браузер сам проставит boundary.
+ */
+export function multipartBody<T extends Record<string, unknown>>(fields: {
+  [K in keyof T]: K extends 'file' ? File : T[K];
+}): { body: T; bodySerializer: (body: T) => FormData } {
+  return {
+    body: fields as unknown as T,
+    bodySerializer: (body) => {
+      const form = new FormData();
+      for (const [key, value] of Object.entries(body) as [string, MultipartValue][]) {
+        if (value === null || value === undefined) continue;
+        if (value instanceof File) form.append(key, value, value.name);
+        else form.append(key, value);
+      }
+      return form;
+    },
+  };
 }
