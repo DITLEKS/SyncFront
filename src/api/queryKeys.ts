@@ -44,6 +44,9 @@ export const queryKeys = {
       ['sources', 'project', projectId, params] as const,
   },
   analysisJobs: {
+    all: ['analysis-jobs'] as const,
+    byDocument: (projectId: string, documentId: string) =>
+      ['analysis-jobs', projectId, documentId] as const,
     detail: (projectId: string, documentId: string, jobId: string) =>
       ['analysis-jobs', projectId, documentId, jobId] as const,
   },

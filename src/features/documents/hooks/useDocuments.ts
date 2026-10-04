@@ -3,18 +3,18 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { queryKeys, type MyDocumentsParams } from '@/api/queryKeys';
 import { deleteDocument, getDocument, listMyDocuments } from '@/api/resources/documents';
 import { getProject, listProjects } from '@/api/resources/projects';
-
-/** Пока в таблице есть документы на анализе, опрашиваем список; на шаге 3 его заменит SSE. */
-const ACTIVE_ANALYSIS_POLL_MS = 5000;
+import { REALTIME_FALLBACK_POLL_MS, useRealtimeConnected } from '@/features/sse';
 
 export function useMyDocuments(params: MyDocumentsParams) {
+  const realtime = useRealtimeConnected();
   return useQuery({
     queryKey: queryKeys.documents.my(params),
     queryFn: () => listMyDocuments(params),
     placeholderData: keepPreviousData,
+    // Статусы приходят по SSE; опрос — только пока соединения нет.
     refetchInterval: (query) =>
-      query.state.data?.items.some((d) => d.status === 'in_progress')
-        ? ACTIVE_ANALYSIS_POLL_MS
+      !realtime && query.state.data?.items.some((d) => d.status === 'in_progress')
+        ? REALTIME_FALLBACK_POLL_MS
         : false,
   });
 }
@@ -45,13 +45,15 @@ export function useBaseSources(projectId: string | null) {
   });
 }
 
-/** Статус документа после запуска анализа в диалоге загрузки. */
-export function useDocumentProgress(projectId: string, documentId: string | null) {
+/** Документ с живым статусом: SSE патчит кеш, без соединения — запасной опрос. */
+export function useDocumentDetail(projectId: string, documentId: string | null) {
+  const realtime = useRealtimeConnected();
   return useQuery({
     queryKey: queryKeys.documents.detail(projectId, documentId ?? ''),
     queryFn: () => getDocument(projectId, documentId ?? ''),
     enabled: Boolean(documentId),
-    refetchInterval: (query) => (query.state.data?.status === 'in_progress' ? 3000 : false),
+    refetchInterval: (query) =>
+      !realtime && query.state.data?.status === 'in_progress' ? REALTIME_FALLBACK_POLL_MS : false,
   });
 }
 

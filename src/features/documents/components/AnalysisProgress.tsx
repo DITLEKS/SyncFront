@@ -5,7 +5,7 @@ import type { DocumentResponse } from '@/api/types';
 import { Button } from '@/components/ui/button';
 import { useAnalysisState } from '@/features/analysis';
 
-import { useDocumentProgress } from '../hooks/useDocuments';
+import { useDocumentDetail } from '../hooks/useDocuments';
 
 interface AnalysisProgressProps {
   projectId: string;
@@ -13,9 +13,9 @@ interface AnalysisProgressProps {
   onOpenDocument: () => void;
 }
 
-/** Ход анализа сразу после загрузки. До SSE (шаг 3) статус опрашивается раз в 3 секунды. */
+/** Ход анализа сразу после загрузки; статус обновляется по SSE. */
 export function AnalysisProgress({ projectId, document, onOpenDocument }: AnalysisProgressProps) {
-  const progress = useDocumentProgress(projectId, document.id);
+  const progress = useDocumentDetail(projectId, document.id);
   const current = progress.data ?? document;
   const analysis = useAnalysisState(projectId, current);
   const link = `/projects/${projectId}/documents/${document.id}`;

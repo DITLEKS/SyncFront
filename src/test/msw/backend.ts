@@ -28,6 +28,7 @@ interface DbDocument {
   uploadedAt: string;
   currentJobId: string | null;
   suggestions: { total: number; pending: number; accepted: number; rejected: number };
+  lastOpenedAt: string | null;
 }
 
 interface DbSource extends SourceResponse {
@@ -94,6 +95,7 @@ export function addDocument(
     uploadedAt: '2026-09-10T09:00:00Z',
     currentJobId: null,
     suggestions: { total: 0, pending: 0, accepted: 0, rejected: 0 },
+    lastOpenedAt: null,
     ...patch,
   };
   db.documents.push(doc);
@@ -380,6 +382,88 @@ export function backendHandlers(db: Db) {
         return job ? HttpResponse.json(job) : notFound();
       },
     ),
+    http.delete(
+      '/api/v1/projects/:projectId/documents/:documentId/analysis-jobs/:jobId',
+      ({ request, params }) => {
+        log(request);
+        const job = db.jobs.find((j) => j.id === params.jobId);
+        const doc = db.documents.find((d) => d.id === params.documentId);
+        if (!job || !doc) return notFound();
+        const cancellable = ['pending', 'dispatched', 'processing', 'cancelled'];
+        if (!cancellable.includes(job.status)) {
+          return HttpResponse.json(
+            { detail: 'Завершённую задачу анализа отменить нельзя' },
+            { status: 409 },
+          );
+        }
+        job.status = 'cancelled';
+        job.error_code = 'ANALYSIS_CANCELLED';
+        job.error_message = 'Анализ отменён';
+        doc.status = 'draft';
+        return HttpResponse.json(job);
+      },
+    ),
+    http.post('/api/v1/projects/:projectId/documents/:documentId/open', ({ request, params }) => {
+      log(request);
+      const doc = db.documents.find((d) => d.id === params.documentId);
+      if (!doc) return notFound();
+      doc.lastOpenedAt = new Date().toISOString();
+      return new HttpResponse(null, { status: 204 });
+    }),
+    http.get('/api/v1/dashboard', ({ request }) => {
+      log(request);
+      const total = db.documents.length;
+      const awaiting = db.documents.filter((d) => d.status === 'awaiting_approval').length;
+      const ready = db.documents.filter((d) => d.status === 'ready').length;
+      const relevance = total === 0 ? 0 : (ready / total) * 100;
+      const week = (value: number) =>
+        Array.from({ length: 7 }, (_, i) => ({ date: `2026-09-${String(24 + i)}`, value }));
+      return HttpResponse.json({
+        total_documents: total,
+        awaiting_approval_count: awaiting,
+        ready_count: ready,
+        relevance_percent: relevance,
+        total_trend: week(total),
+        awaiting_trend: week(awaiting),
+        relevance_trend: week(relevance),
+      });
+    }),
+    http.get('/api/v1/documents/attention', ({ request }) => {
+      log(request);
+      return HttpResponse.json(
+        db.documents
+          .filter((d) => d.status === 'awaiting_approval')
+          .sort((a, b) => b.suggestions.pending - a.suggestions.pending)
+          .slice(0, 4)
+          .map((d) => ({
+            id: d.id,
+            title: d.name,
+            project_id: d.projectId,
+            project_name: db.projects.find((p) => p.id === d.projectId)?.name ?? '',
+            pending_suggestions: d.suggestions.pending,
+            updated_at: d.uploadedAt,
+          })),
+      );
+    }),
+    http.get('/api/v1/documents/recent', ({ request }) => {
+      log(request);
+      return HttpResponse.json(
+        db.documents
+          .filter((d): d is DbDocument & { lastOpenedAt: string } => d.lastOpenedAt !== null)
+          .sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt))
+          .slice(0, 5)
+          .map((d) => ({
+            id: d.id,
+            title: d.name,
+            project_id: d.projectId,
+            project_name: db.projects.find((p) => p.id === d.projectId)?.name ?? '',
+            status: d.status,
+            last_opened_at: d.lastOpenedAt,
+            suggestions_total: d.suggestions.total,
+            suggestions_resolved: d.suggestions.accepted + d.suggestions.rejected,
+          })),
+      );
+    }),
     http.post('/api/v1/projects/:projectId/documents/analysis-jobs/bulk', async ({ request }) => {
       const body = (await request.json()) as { document_ids: string[]; force: boolean };
       log(request, body);

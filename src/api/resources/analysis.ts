@@ -53,3 +53,19 @@ export async function startBulkAnalysis(
     }),
   );
 }
+
+/** Отменить задачу. 409 — задача уже завершилась и отмене не подлежит. */
+export async function cancelAnalysisJob(
+  projectId: string,
+  documentId: string,
+  jobId: string,
+): Promise<AnalysisJobResponse> {
+  return ok(
+    await client.DELETE(
+      '/api/v1/projects/{project_id}/documents/{document_id}/analysis-jobs/{job_id}',
+      {
+        params: { path: { project_id: projectId, document_id: documentId, job_id: jobId } },
+      },
+    ),
+  );
+}
