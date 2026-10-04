@@ -67,7 +67,7 @@ function RecentRow({ item }: { item: RecentDocumentItem }) {
         <ChangesCell resolved={item.suggestions_resolved} total={item.suggestions_total} />
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-        {formatDate(item.last_opened_at)}
+        {formatDate(item.uploaded_at)}
       </td>
       <td className="px-4 py-3">
         {isDocumentStatus(item.status) ? <DocumentStatusBadge status={item.status} /> : item.status}
@@ -82,7 +82,7 @@ function RecentRow({ item }: { item: RecentDocumentItem }) {
   );
 }
 
-/** «Недавние документы»: до пяти последних открытых, от самого свежего. */
+/** «Недавние документы»: до пяти последних открытых, от самого свежего; дата — загрузки. */
 export function RecentDocuments() {
   const recent = useRecentDocuments();
 
@@ -121,7 +121,7 @@ export function RecentDocuments() {
               <th className="px-4 py-2 font-medium">Документ</th>
               <th className="px-4 py-2 font-medium">Проект</th>
               <th className="px-4 py-2 font-medium">Изменений</th>
-              <th className="px-4 py-2 font-medium">Открыт</th>
+              <th className="px-4 py-2 font-medium">Дата</th>
               <th className="px-4 py-2 font-medium">Статус</th>
               <th className="w-8" aria-hidden />
             </tr>

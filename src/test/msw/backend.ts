@@ -458,6 +458,7 @@ export function backendHandlers(db: Db) {
             project_id: d.projectId,
             project_name: db.projects.find((p) => p.id === d.projectId)?.name ?? '',
             status: d.status,
+            uploaded_at: d.uploadedAt,
             last_opened_at: d.lastOpenedAt,
             suggestions_total: d.suggestions.total,
             suggestions_resolved: d.suggestions.accepted + d.suggestions.rejected,

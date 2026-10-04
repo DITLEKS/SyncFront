@@ -51,6 +51,7 @@ function seed() {
       name: 'webhooks.md',
       status: 'ready',
       suggestions: { total: 4, pending: 0, accepted: 3, rejected: 1 },
+      uploadedAt: '2026-09-15T09:00:00Z',
       lastOpenedAt: '2026-10-04T10:00:00Z',
     }),
     addDocument(db, project.id, { name: 'limits.md', status: 'in_progress' }),
@@ -82,6 +83,8 @@ describe('Рабочее пространство', () => {
     expect(rows).toHaveLength(3);
     expect(rows[1]).toHaveTextContent('webhooks.md');
     expect(rows[1]).toHaveTextContent('4/4');
+    // В столбце «Дата» — дата загрузки, а не открытия.
+    expect(rows[1]).toHaveTextContent(/15 сент\.? 2026/);
     expect(
       within(rows[1] as HTMLElement).getByRole('link', { name: 'Платёжный шлюз' }),
     ).toHaveAttribute('href', `/projects/${project.id}`);
