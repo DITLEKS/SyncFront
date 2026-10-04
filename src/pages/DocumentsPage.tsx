@@ -1,11 +1,22 @@
+import { MyDocumentsView } from '@/features/documents';
+import { pluralize } from '@/lib/format';
+
 import { PageHeader } from './PageHeader';
-import { UnderConstruction } from './UnderConstruction';
 
 export function DocumentsPage() {
   return (
-    <>
-      <PageHeader title="Мои документы" />
-      <UnderConstruction step="Шаг 2: таблица документов с поиском, фильтром по статусу и удалением." />
-    </>
+    <MyDocumentsView
+      renderHeader={({ total, uploadButton }) => (
+        <PageHeader
+          title="Мои документы"
+          meta={
+            total === undefined
+              ? undefined
+              : `${total} ${pluralize(total, ['документ', 'документа', 'документов'])}`
+          }
+          actions={uploadButton}
+        />
+      )}
+    />
   );
 }

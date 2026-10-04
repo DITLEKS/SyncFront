@@ -23,6 +23,8 @@ export const queryKeys = {
     all: ['projects'] as const,
     list: (params: PageParams = {}) => ['projects', 'list', params] as const,
     detail: (projectId: string) => ['projects', 'detail', projectId] as const,
+    /** Вложен в detail: инвалидация страницы проекта обновляет и этот запрос. */
+    baseSources: (projectId: string) => ['projects', 'detail', projectId, 'sources'] as const,
   },
   documents: {
     all: ['documents'] as const,

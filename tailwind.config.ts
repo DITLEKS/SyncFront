@@ -39,8 +39,15 @@ export default {
       },
       keyframes: {
         'fade-in': { from: { opacity: '0', transform: 'translateY(4px)' }, to: { opacity: '1' } },
+        'progress-indeterminate': {
+          from: { transform: 'translateX(-100%)' },
+          to: { transform: 'translateX(300%)' },
+        },
       },
-      animation: { 'fade-in': 'fade-in 200ms ease-out' },
+      animation: {
+        'fade-in': 'fade-in 200ms ease-out',
+        'progress-indeterminate': 'progress-indeterminate 1.4s ease-in-out infinite',
+      },
     },
   },
   plugins: [animate],
