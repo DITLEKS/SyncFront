@@ -39,15 +39,16 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'sticky top-0 z-20 flex h-dvh shrink-0 flex-col border-r bg-card shadow-sm transition-[width] duration-300 ease-in-out motion-reduce:transition-none',
+        'relative sticky top-0 z-20 flex h-dvh shrink-0 flex-col overflow-visible border-r bg-card shadow-sm transition-[width] duration-300 ease-in-out motion-reduce:transition-none',
         collapsed ? 'w-20' : 'w-20 md:w-64',
       )}
       aria-label="Основная навигация"
     >
+      <div className="sidebar-atmosphere" aria-hidden="true" />
       <Button
         variant="outline"
         size="icon"
-        className="absolute -right-3 top-6 hidden size-6 rounded-full bg-card p-1 text-muted-foreground md:inline-flex"
+        className="absolute -right-3 top-6 z-20 hidden size-6 rounded-full bg-card p-1 text-muted-foreground shadow-sm md:inline-flex"
         onClick={onToggle}
         aria-label={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
         aria-expanded={!collapsed}
@@ -57,7 +58,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </Button>
       <div
         className={cn(
-          'flex h-16 shrink-0 items-center justify-center gap-3 border-b px-4',
+          'relative z-10 flex h-16 shrink-0 items-center justify-center gap-3 border-b border-border/70 px-4',
           !collapsed && 'md:justify-start',
         )}
       >
@@ -70,7 +71,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         ) : null}
       </div>
 
-      <div className="shrink-0 px-6 pb-2 pt-6">
+      <div className="relative z-10 shrink-0 px-6 pb-2 pt-6">
         <span
           className={cn(
             'block h-4 text-xs font-bold uppercase tracking-wider text-muted-foreground',
@@ -80,13 +81,16 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           Навигация
         </span>
       </div>
-      <nav id="sidebar-navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3">
+      <nav
+        id="sidebar-navigation"
+        className="relative z-10 min-h-0 flex-1 space-y-1 overflow-y-auto px-3"
+      >
         {NAV_ITEMS.map((item) => (
           <SidebarLink key={item.to} item={item} collapsed={collapsed} />
         ))}
       </nav>
 
-      <div className="shrink-0 space-y-1 border-t bg-muted/30 p-3">
+      <div className="relative z-10 shrink-0 space-y-1 border-t border-border/70 bg-card/80 p-3 backdrop-blur-sm">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -119,9 +123,11 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
       to={item.to}
       end={item.end}
       className={cn(
-        'group mx-auto flex h-12 w-12 items-center justify-center gap-3 rounded-xl text-sm font-medium transition-colors duration-200 motion-reduce:transition-none',
-        'hover:bg-muted hover:text-foreground',
-        isActive ? 'bg-accent font-semibold text-accent-foreground' : 'text-muted-foreground',
+        'group mx-auto flex h-12 w-12 items-center justify-center gap-3 rounded-xl text-sm font-medium transition-[color,background-color,box-shadow,transform] duration-200 motion-reduce:transition-none',
+        'hover:bg-card/80 hover:text-foreground hover:shadow-sm active:scale-[0.98]',
+        isActive
+          ? 'bg-accent font-semibold text-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.08)]'
+          : 'text-muted-foreground',
         !collapsed && 'md:h-10 md:w-full md:justify-start md:px-3',
       )}
       aria-label={item.label}
@@ -130,7 +136,7 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
       {!collapsed ? <span className="hidden truncate md:inline">{item.label}</span> : null}
       {isActive && !collapsed ? (
         <span
-          className="ml-auto hidden size-1.5 shrink-0 rounded-full bg-primary md:block"
+          className="ml-auto hidden size-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.1)] md:block"
           aria-hidden
         />
       ) : null}

@@ -102,10 +102,16 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
 
   const allProcessed = progress.total > 0 && progress.pending === 0;
   const completed = status === 'ready' && model.unsavedCount === 0;
+  const liveStatus = liveStatusText({
+    saving: model.saving,
+    conflict: Boolean(model.conflict),
+    error: Boolean(model.saveError),
+    unsaved: model.unsavedCount,
+  });
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+      <header className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-b bg-background/95 px-4 pb-4 pt-2 backdrop-blur-sm md:-mx-8 md:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <Button size="icon" variant="ghost" onClick={goBack} aria-label="Назад">
             <ArrowLeft aria-hidden />
@@ -166,6 +172,11 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
         </div>
       </header>
 
+      {/* Озвучка состояния ревью для скринридеров; тексты не повторяют видимые баннеры. */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {liveStatus}
+      </div>
+
       {model.conflict ? (
         <Alert variant="warning">
           <TriangleAlert aria-hidden />
@@ -210,7 +221,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
           </article>
         </section>
 
-        <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
+        <div className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
           <SuggestionsPanel
             suggestions={model.suggestions}
             statusOf={model.statusOf}
@@ -303,6 +314,22 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
       />
     </div>
   );
+}
+
+interface LiveStatusInput {
+  saving: boolean;
+  conflict: boolean;
+  error: boolean;
+  unsaved: number;
+}
+
+/** Короткое сообщение для aria-live: одно состояние за раз, без дублирования баннеров. */
+function liveStatusText({ saving, conflict, error, unsaved }: LiveStatusInput): string {
+  if (saving) return 'Идёт сохранение решений';
+  if (conflict) return 'Загружена актуальная версия документа, буфер решений сохранён';
+  if (error) return 'Сохранение завершилось ошибкой';
+  if (unsaved > 0) return `Несохранённых решений: ${unsaved}`;
+  return '';
 }
 
 function SaveButton({

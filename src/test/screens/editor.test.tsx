@@ -305,7 +305,7 @@ describe('Редактор правок', () => {
     expect(within(card).getByText(/Фрагмент не найден в тексте/)).toBeInTheDocument();
   });
 
-  it('догружает правки сверх первой страницы', async () => {
+  it('догружает правки сверх первой страницы и виртуализирует длинный список', async () => {
     const { project, doc } = setup();
     for (let i = 0; i < 199; i += 1) {
       addSuggestion(db, doc, { change_type: 'add', suggested_text: `Пункт ${i}` });
@@ -317,6 +317,10 @@ describe('Редактор правок', () => {
     expect(
       db.requests.some((r) => r.path.includes('/suggestions?') && r.path.includes('offset=200')),
     ).toBe(true);
-    expect(screen.getByRole('button', { name: /Показать ещё 100/ })).toBeInTheDocument();
+    // В DOM только видимая часть списка, кнопки дорисовки больше нет.
+    expect(screen.queryByRole('button', { name: /Показать ещё/ })).not.toBeInTheDocument();
+    const rendered = within(list()).getAllByRole('listitem');
+    expect(rendered.length).toBeGreaterThan(0);
+    expect(rendered.length).toBeLessThan(201);
   });
 });
