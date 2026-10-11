@@ -6,16 +6,12 @@ import type { SuggestionResponse } from '@/api/types';
 import { Progress } from '@/components/ui/progress';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { EmptyState } from '@/components/ui/state';
-import type { LocatedSuggestion, SuggestionIssue } from '@/domain/editor/projection';
+import type { LocatedSuggestion, LocateIssue } from '@/domain/editor/projection';
 import type { ReviewProgress } from '@/domain/editor/review';
 import { decisionLabel, type SuggestionStatus } from '@/domain/editor/suggestion';
 import { cn } from '@/lib/cn';
 
-import {
-  ESTIMATED_CARD_HEIGHT,
-  isVirtualized,
-  LIST_OVERSCAN,
-} from '../model/suggestionList';
+import { ESTIMATED_CARD_HEIGHT, isVirtualized, LIST_OVERSCAN } from '../model/suggestionList';
 import { EMPTY_FILTER_TEXTS, ISSUE_TEXTS } from '../model/texts';
 
 import { ChangeTypeBadge } from './ChangeTypeBadge';
@@ -61,7 +57,7 @@ export function SuggestionsPanel({
     <SuggestionCard
       suggestion={s}
       status={statusOf(s)}
-      issue={located[s.id]?.issue}
+      issue={located[s.id]?.issue ?? null}
       selected={s.id === selectedId}
       unsaved={unsavedIds.has(s.id)}
       onSelect={onSelect}
@@ -164,7 +160,7 @@ function VirtualSuggestionList({ items, selectedId, renderCard }: VirtualSuggest
 interface SuggestionCardProps {
   suggestion: SuggestionResponse;
   status: SuggestionStatus;
-  issue: SuggestionIssue | undefined;
+  issue: LocateIssue | null;
   selected: boolean;
   unsaved: boolean;
   onSelect: (id: string) => void;
