@@ -116,12 +116,20 @@ export function ProjectPage() {
         </div>
       </header>
 
-      <section aria-labelledby="base-sources-title" className="mb-8">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <div>
-            <h2 id="base-sources-title" className="text-lg font-semibold">
-              Базовые источники истины
-            </h2>
+      <section
+        aria-labelledby="base-sources-title"
+        className="mb-8 rounded-2xl border bg-card p-5 shadow-sm"
+      >
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 id="base-sources-title" className="text-lg font-semibold">
+                Базовые источники истины
+              </h2>
+              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                для всех документов
+              </span>
+            </div>
             <p className="text-sm text-muted-foreground">
               Применяются к каждому документу проекта.
             </p>

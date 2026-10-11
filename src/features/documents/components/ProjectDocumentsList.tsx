@@ -37,7 +37,7 @@ export function ProjectDocumentsList({
 
   return (
     <>
-      <ul className="divide-y rounded-lg border bg-card">
+      <ul className="space-y-3">
         {documents.map((doc) => (
           <ProjectDocumentRow
             key={doc.id}
@@ -83,7 +83,7 @@ function ProjectDocumentRow({
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
   return (
-    <li>
+    <li className="overflow-hidden rounded-xl border bg-card shadow-sm">
       <div
         className="group flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-muted/40"
         onClick={() => navigate(href)}
