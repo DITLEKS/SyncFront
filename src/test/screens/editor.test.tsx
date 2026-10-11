@@ -310,6 +310,18 @@ describe('Редактор правок', () => {
     for (let i = 0; i < 199; i += 1) {
       addSuggestion(db, doc, { change_type: 'add', suggested_text: `Пункт ${i}` });
     }
+    // jsdom не считает layout: без размера окна прокрутки виртуализатор не рисует ни одной карточки.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      width: 352,
+      height: 600,
+      top: 0,
+      left: 0,
+      bottom: 600,
+      right: 352,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
     open(project.id, doc.id);
     await documentText();
 
