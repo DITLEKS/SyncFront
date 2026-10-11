@@ -173,9 +173,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
       </header>
 
       {/* Озвучка состояния ревью для скринридеров; тексты не повторяют видимые баннеры. */}
-      <div className="sr-only" aria-live="polite" aria-atomic="true">
-        {liveStatus}
-      </div>
+      <div className="sr-only" aria-live="polite" aria-atomic="true">{liveStatus}</div>
 
       {model.conflict ? (
         <Alert variant="warning">
