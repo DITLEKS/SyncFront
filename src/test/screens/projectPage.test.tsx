@@ -86,7 +86,7 @@ describe('Страница проекта', () => {
       ),
     );
     const user = userEvent.setup();
-    setup();
+    const { project } = setup();
     await screen.findByRole('heading', { level: 1 });
     await user.click(screen.getByRole('button', { name: 'Добавить' }));
     await user.click(screen.getByRole('tab', { name: 'Ссылка' }));
@@ -97,7 +97,9 @@ describe('Страница проекта', () => {
       await screen.findByText('Источники заблокированы: идёт анализ документов проекта'),
     ).toBeInTheDocument();
     expect(screen.getByText('Спецификация API')).toBeInTheDocument();
-    expect(db.sources.filter((s) => s.projectId === db.projects[0]?.id)).toHaveLength(2);
+    expect(
+      db.sources.filter((s) => s.project_id === project.id && s.scope === 'project'),
+    ).toHaveLength(1);
   });
 
   it('групповой анализ берёт draft и ready, а ready запускает после подтверждения', async () => {
