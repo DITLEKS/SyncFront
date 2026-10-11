@@ -233,17 +233,16 @@ describe('Раздел «Проекты»', () => {
     expect(
       await within(dialog).findByText('Проект заблокирован: идёт анализ документов'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    // Пока модальное окно открыто, страница под ним aria-hidden — карточку проверяем после закрытия.
+    await user.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'Защищённый' })).toBeInTheDocument();
   });
 
   it('ошибка переименования остаётся в окне, введённое название не теряется', async () => {
     server.use(
       http.patch('/api/v1/projects/:projectId', () =>
-        HttpResponse.json(
-          { detail: 'Проект с таким названием уже существует' },
-          { status: 409 },
-        ),
+        HttpResponse.json({ detail: 'Проект с таким названием уже существует' }, { status: 409 }),
       ),
     );
     addProject(db, { name: 'Исходное' });
@@ -260,6 +259,8 @@ describe('Раздел «Проекты»', () => {
       await within(dialog).findByText('Проект с таким названием уже существует'),
     ).toBeInTheDocument();
     expect(input).toHaveValue('Дубль');
+    await user.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'Исходное' })).toBeInTheDocument();
   });
 });
