@@ -1,4 +1,4 @@
-import { ArrowRight, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRight, Database, FileText, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import type { ProjectResponse } from '@/api/types';
@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { projectColor } from '@/domain/project/appearance';
 import { formatDate, pluralize } from '@/lib/format';
 
 import { ProjectIcon } from './ProjectIcon';
@@ -26,52 +27,75 @@ interface ProjectCardProps {
 export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
   const documents = project.document_count;
   const sources = project.source_count;
+  const color = projectColor(project);
+
   return (
-    <article className="group relative flex flex-col rounded-xl border bg-card p-5 shadow-sm transition-all duration-200 focus-within:ring-2 focus-within:ring-ring hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0">
-      <div className="flex items-start gap-3 pr-8">
-        <ProjectIcon project={project} />
-        <div className="min-w-0">
-          <h3 className="truncate font-semibold" title={project.name}>
-            <Link
-              to={`/projects/${project.id}`}
-              className="outline-none after:absolute after:inset-0 after:rounded-xl"
-            >
-              {project.name}
-            </Link>
-          </h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Создан {formatDate(project.created_at)}
-          </p>
+    <article className="group relative flex min-h-64 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-200 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:-translate-y-0.5 hover:border-border hover:shadow-md motion-reduce:hover:translate-y-0">
+      <div
+        className="absolute inset-x-0 top-0 z-10 h-0.5"
+        style={{ backgroundColor: color }}
+        aria-hidden
+      />
+
+      <div
+        className="relative flex flex-1 flex-col px-5 pb-5 pt-6"
+        style={{
+          background: `linear-gradient(145deg, ${color}14 0%, ${color}08 45%, transparent 76%)`,
+        }}
+      >
+        <div className="flex items-start gap-4 pr-8">
+          <ProjectIcon
+            project={project}
+            className="size-12 rounded-xl bg-card shadow-[0_4px_14px_hsl(var(--foreground)/0.06)] ring-1 ring-border/50"
+          />
+          <div className="min-w-0 flex-1 pt-0.5">
+            <h3 className="truncate text-base font-semibold leading-6" title={project.name}>
+              <Link
+                to={`/projects/${project.id}`}
+                className="outline-none after:absolute after:inset-0 after:rounded-2xl"
+              >
+                {project.name}
+              </Link>
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Создан {formatDate(project.created_at)}
+            </p>
+          </div>
         </div>
+
+        <p className="mt-5 line-clamp-3 min-h-[3.75rem] text-sm leading-5 text-muted-foreground">
+          {project.description || 'В проекте пока нет описания.'}
+        </p>
       </div>
-      <p className="mt-3 line-clamp-2 min-h-10 text-sm text-muted-foreground">
-        {project.description || 'Без описания'}
-      </p>
-      <dl className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
-        <div>
+
+      <dl className="flex min-h-14 items-center gap-5 border-t border-border/70 bg-card/90 px-5 py-3 text-xs text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <FileText className="size-3.5 shrink-0" aria-hidden />
           <dt className="sr-only">Документы</dt>
-          <dd>
+          <dd className="truncate">
             {documents} {pluralize(documents, ['документ', 'документа', 'документов'])}
           </dd>
         </div>
-        <div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Database className="size-3.5 shrink-0" aria-hidden />
           <dt className="sr-only">Базовые источники</dt>
-          <dd>
+          <dd className="truncate">
             {sources} {pluralize(sources, ['источник', 'источника', 'источников'])}
           </dd>
         </div>
         <ArrowRight
           aria-hidden
-          className="ml-auto size-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-foreground"
+          className="ml-auto size-4 shrink-0 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-foreground motion-reduce:transition-none"
         />
       </dl>
-      <div className="absolute right-3 top-3 z-10 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+
+      <div className="absolute right-3 top-4 z-20 opacity-100 transition-opacity duration-150 md:opacity-0 md:focus-within:opacity-100 md:group-hover:opacity-100 md:has-[[data-state=open]]:opacity-100">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="size-8"
+              className="size-9 rounded-lg bg-card/70 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-card hover:text-foreground"
               aria-label={`Действия с проектом ${project.name}`}
             >
               <MoreHorizontal aria-hidden />

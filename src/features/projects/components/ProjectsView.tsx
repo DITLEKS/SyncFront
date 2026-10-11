@@ -41,12 +41,12 @@ export function ProjectsView({ renderHeader }: ProjectsViewProps) {
 
       {query.isPending ? (
         <div
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3"
           aria-busy="true"
           aria-label="Загрузка проектов"
         >
           {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-44 rounded-xl" />
+            <Skeleton key={i} className="h-64 rounded-2xl" />
           ))}
         </div>
       ) : query.isError ? (
@@ -60,7 +60,7 @@ export function ProjectsView({ renderHeader }: ProjectsViewProps) {
         />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {projects.map((project) => (
               <ProjectCard
                 key={project.id}
@@ -71,7 +71,7 @@ export function ProjectsView({ renderHeader }: ProjectsViewProps) {
             ))}
           </div>
           {query.hasNextPage ? (
-            <div className="mt-6 flex justify-center">
+            <div className="mt-8 flex justify-center">
               <Button
                 variant="outline"
                 loading={query.isFetchingNextPage}
