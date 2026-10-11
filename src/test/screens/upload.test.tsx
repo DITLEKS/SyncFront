@@ -94,6 +94,24 @@ describe('Загрузка документа', () => {
     expect(db.documents).toHaveLength(0);
   });
 
+  it.each([
+    { status: 415, detail: 'Формат файла не поддерживается' },
+    { status: 422, detail: 'Файл повреждён или пуст' },
+  ])('ошибка $status при загрузке: показываем текст сервера, файл не создаётся', async ({ status, detail }) => {
+    server.use(
+      http.post('/api/v1/projects/:projectId/documents', () =>
+        HttpResponse.json({ detail }, { status }),
+      ),
+    );
+    const { user, dialog } = await openFromProject();
+    await user.upload(within(dialog).getByLabelText('Файл документа'), new File(['x'], 'spec.md'));
+    await user.click(within(dialog).getByRole('button', { name: 'Далее' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Запустить анализ' }));
+    expect(await within(dialog).findByText('Документ не загружен')).toBeInTheDocument();
+    expect(within(dialog).getByText(detail)).toBeInTheDocument();
+    expect(db.documents).toHaveLength(0);
+  });
+
   it('если задача не создалась, документ остаётся черновиком и повтор не загружает файл заново', async () => {
     let attempts = 0;
     server.use(
