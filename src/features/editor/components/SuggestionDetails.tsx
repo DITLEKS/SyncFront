@@ -73,13 +73,7 @@ export function SuggestionDetails({
             </p>
           ) : null}
         </div>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-7"
-          onClick={onClose}
-          aria-label="Закрыть карточку"
-        >
+        <Button size="iconXs" variant="ghost" onClick={onClose} aria-label="Закрыть карточку">
           <X aria-hidden />
         </Button>
       </header>

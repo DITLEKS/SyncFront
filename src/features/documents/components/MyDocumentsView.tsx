@@ -296,7 +296,7 @@ function DocumentRow({ document: doc, onOpen, onDelete }: DocumentRowProps) {
         <div className="flex justify-end gap-1 opacity-60 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button asChild variant="ghost" size="icon" className="size-8">
+              <Button asChild variant="ghost" size="iconSm">
                 <Link to={href} aria-label={`Открыть ${doc.name}`}>
                   <ExternalLink aria-hidden />
                 </Link>
@@ -310,8 +310,8 @@ function DocumentRow({ document: doc, onOpen, onDelete }: DocumentRowProps) {
               <span tabIndex={canDelete ? -1 : 0}>
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="size-8 text-muted-foreground hover:text-destructive"
+                  size="iconSm"
+                  className="text-muted-foreground hover:text-destructive"
                   disabled={!canDelete}
                   aria-label={`Удалить ${doc.name}`}
                   onClick={onDelete}

@@ -148,8 +148,8 @@ function ProjectDocumentRow({
               <span tabIndex={canDelete ? -1 : 0}>
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="size-8 text-muted-foreground hover:text-destructive"
+                  size="iconSm"
+                  className="text-muted-foreground hover:text-destructive"
                   disabled={!canDelete}
                   aria-label={`Удалить ${doc.name}`}
                   onClick={onDelete}

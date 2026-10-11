@@ -5,6 +5,8 @@ import * as React from 'react';
 
 import { cn } from '@/lib/cn';
 
+// Icon-варианты сохраняют компактный визуальный размер, но псевдоэлементом
+// расширяют область нажатия до 44×44 px для touch-устройств.
 const buttonVariants = cva(
   'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
@@ -22,7 +24,9 @@ const buttonVariants = cva(
         default: 'h-9 px-4 py-2',
         sm: 'h-8 rounded-md px-3 text-xs',
         lg: 'h-10 rounded-md px-6',
-        icon: 'h-9 w-9',
+        icon: 'relative h-9 w-9 before:absolute before:-inset-1 before:content-[""]',
+        iconSm: 'relative h-8 w-8 before:absolute before:-inset-1.5 before:content-[""]',
+        iconXs: 'relative h-7 w-7 before:absolute before:-inset-2 before:content-[""]',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },

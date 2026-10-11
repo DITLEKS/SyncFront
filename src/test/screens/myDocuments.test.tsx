@@ -37,7 +37,7 @@ describe('Раздел «Мои документы»', () => {
     expect(screen.getAllByRole('button', { name: 'Загрузить документ' })).toHaveLength(2);
   });
 
-  it('таблица: плашка проекта, «Изм.» с прочерком, блокировка удаления в работе', async () => {
+  it('таблица: плашка проекта, «Изм.» с прогрессом или прочерком, блокировка удаления в работе', async () => {
     const project = seed();
     renderDocuments();
     const guideRow = (await screen.findByRole('link', { name: 'guide.md' })).closest('tr');
@@ -48,7 +48,11 @@ describe('Раздел «Мои документы»', () => {
       `/projects/${project.id}`,
     );
     expect(within(guideRow).getByText('7')).toBeInTheDocument();
+    expect(
+      within(guideRow).getByRole('progressbar', { name: 'Рассмотрено 4 из 7' }),
+    ).toHaveAttribute('aria-valuenow', '57');
     expect(within(notesRow).getByText('—')).toBeInTheDocument();
+    expect(within(notesRow).queryByRole('progressbar')).not.toBeInTheDocument();
     expect(within(notesRow).getByRole('button', { name: 'Удалить notes.txt' })).toBeDisabled();
     expect(screen.getByText('2 документа')).toBeInTheDocument();
   });

@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { HttpResponse, http } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { REANALYSIS_TITLE } from '@/features/analysis';
@@ -73,6 +74,32 @@ describe('Страница проекта', () => {
     expect(
       screen.queryByRole('button', { name: 'Удалить источник Тикет PAY-12' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('423 при добавлении базового источника показывает текст сервера, список не меняется', async () => {
+    server.use(
+      http.post('/api/v1/projects/:projectId/sources', () =>
+        HttpResponse.json(
+          { detail: 'Источники заблокированы: идёт анализ документов проекта' },
+          { status: 423 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    const { project } = setup();
+    await screen.findByRole('heading', { level: 1 });
+    await user.click(screen.getByRole('button', { name: 'Добавить' }));
+    await user.click(screen.getByRole('tab', { name: 'Ссылка' }));
+    await user.type(screen.getByLabelText('Адрес ссылки'), 'https://wiki.example.com/pay');
+    await user.click(screen.getByRole('button', { name: 'Добавить ссылку' }));
+
+    expect(
+      await screen.findByText('Источники заблокированы: идёт анализ документов проекта'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Спецификация API')).toBeInTheDocument();
+    expect(
+      db.sources.filter((s) => s.project_id === project.id && s.scope === 'project'),
+    ).toHaveLength(1);
   });
 
   it('групповой анализ берёт draft и ready, а ready запускает после подтверждения', async () => {
