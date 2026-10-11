@@ -1,24 +1,26 @@
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { CheckCircle2, Inbox, TriangleAlert } from 'lucide-react';
-import { useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 
 import type { SuggestionResponse } from '@/api/types';
-import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { EmptyState } from '@/components/ui/state';
-import type { LocatedSuggestion } from '@/domain/editor/projection';
+import type { LocatedSuggestion, SuggestionIssue } from '@/domain/editor/projection';
 import type { ReviewProgress } from '@/domain/editor/review';
 import { decisionLabel, type SuggestionStatus } from '@/domain/editor/suggestion';
 import { cn } from '@/lib/cn';
 
+import {
+  ESTIMATED_CARD_HEIGHT,
+  isVirtualized,
+  LIST_OVERSCAN,
+} from '../model/suggestionList';
 import { EMPTY_FILTER_TEXTS, ISSUE_TEXTS } from '../model/texts';
 
 import { ChangeTypeBadge } from './ChangeTypeBadge';
 
 export type SuggestionFilter = 'pending' | 'decided' | 'all';
-
-/** Сколько карточек показывать за раз: длинный список дорисовывается по кнопке. */
-export const SUGGESTIONS_RENDER_STEP = 100;
 
 interface SuggestionsPanelProps {
   suggestions: SuggestionResponse[];
@@ -47,7 +49,6 @@ export function SuggestionsPanel({
   header,
 }: SuggestionsPanelProps) {
   const [filter, setFilter] = useState<SuggestionFilter>('pending');
-  const [visible, setVisible] = useState(SUGGESTIONS_RENDER_STEP);
 
   const filtered = suggestions.filter((s) => {
     const status = statusOf(s);
@@ -55,7 +56,17 @@ export function SuggestionsPanel({
     if (filter === 'decided') return status !== 'pending';
     return true;
   });
-  const shown = filtered.slice(0, visible);
+
+  const renderCard = (s: SuggestionResponse) => (
+    <SuggestionCard
+      suggestion={s}
+      status={statusOf(s)}
+      issue={located[s.id]?.issue}
+      selected={s.id === selectedId}
+      unsaved={unsavedIds.has(s.id)}
+      onSelect={onSelect}
+    />
+  );
 
   return (
     <aside aria-labelledby="suggestions-title" className="flex min-h-0 flex-col gap-3">
@@ -76,10 +87,7 @@ export function SuggestionsPanel({
       <SegmentedControl<SuggestionFilter>
         ariaLabel="Фильтр предложений"
         value={filter}
-        onChange={(next) => {
-          setFilter(next);
-          setVisible(SUGGESTIONS_RENDER_STEP);
-        }}
+        onChange={setFilter}
         options={[
           { value: 'pending', label: 'На рассмотрении', count: progress.pending },
           { value: 'decided', label: 'Решено', count: progress.decided },
@@ -89,67 +97,124 @@ export function SuggestionsPanel({
 
       {filtered.length === 0 ? (
         <EmptyState icon={Inbox} title={EMPTY_FILTER_TEXTS[filter]} className="py-8" />
+      ) : isVirtualized(filtered.length) ? (
+        <VirtualSuggestionList items={filtered} selectedId={selectedId} renderCard={renderCard} />
       ) : (
         <ul className="space-y-2" aria-label="Список предложений">
-          {shown.map((s) => {
-            const status = statusOf(s);
-            const issue = located[s.id]?.issue;
-            const selected = s.id === selectedId;
-            return (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => onSelect(s.id)}
-                  className={cn(
-                    'w-full space-y-1.5 rounded-lg border bg-card p-3 text-left text-sm shadow-sm transition-colors hover:bg-accent/50',
-                    selected && 'border-primary ring-1 ring-primary',
-                  )}
-                >
-                  <span className="flex items-center gap-2">
-                    <ChangeTypeBadge type={s.change_type} />
-                    {status !== 'pending' ? (
-                      <span
-                        className={cn(
-                          'inline-flex items-center gap-1 text-xs font-medium',
-                          status === 'accepted' ? 'text-emerald-700' : 'text-muted-foreground',
-                        )}
-                      >
-                        {status === 'accepted' ? (
-                          <CheckCircle2 className="size-3" aria-hidden />
-                        ) : null}
-                        {decisionLabel[status]}
-                        {unsavedIds.has(s.id) ? ' · не сохранено' : ''}
-                      </span>
-                    ) : null}
-                    {issue ? (
-                      <TriangleAlert
-                        className="ml-auto size-4 shrink-0 text-amber-600"
-                        aria-label={ISSUE_TEXTS[issue]}
-                      />
-                    ) : null}
-                  </span>
-                  <span className="line-clamp-2 block break-words">{shortText(s)}</span>
-                  {s.section_ref ? (
-                    <span className="block truncate text-xs text-muted-foreground">
-                      Раздел: {s.section_ref}
-                    </span>
-                  ) : null}
-                </button>
-              </li>
-            );
-          })}
+          {filtered.map((s) => (
+            <li key={s.id}>{renderCard(s)}</li>
+          ))}
         </ul>
       )}
-      {filtered.length > shown.length ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setVisible((n) => n + SUGGESTIONS_RENDER_STEP)}
-        >
-          Показать ещё {Math.min(SUGGESTIONS_RENDER_STEP, filtered.length - shown.length)}
-        </Button>
-      ) : null}
     </aside>
   );
 }
+
+interface VirtualSuggestionListProps {
+  items: SuggestionResponse[];
+  selectedId: string | null;
+  renderCard: (s: SuggestionResponse) => React.ReactNode;
+}
+
+/** Длинный список: в DOM только видимые карточки плюс небольшой запас сверху и снизу. */
+function VirtualSuggestionList({ items, selectedId, renderCard }: VirtualSuggestionListProps) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ESTIMATED_CARD_HEIGHT,
+    overscan: LIST_OVERSCAN,
+    getItemKey: (index) => items[index]?.id ?? index,
+  });
+
+  // Правка, выбранная кликом по тексту, должна оказаться в видимой части списка.
+  useEffect(() => {
+    if (!selectedId) return;
+    const index = items.findIndex((s) => s.id === selectedId);
+    if (index >= 0) virtualizer.scrollToIndex(index, { align: 'auto' });
+  }, [selectedId, items, virtualizer]);
+
+  return (
+    <div ref={parentRef} className="max-h-[60vh] overflow-y-auto pr-1">
+      <ul
+        aria-label="Список предложений"
+        className="relative"
+        style={{ height: virtualizer.getTotalSize() }}
+      >
+        {virtualizer.getVirtualItems().map((row) => {
+          const suggestion = items[row.index];
+          if (!suggestion) return null;
+          return (
+            <li
+              key={row.key}
+              ref={virtualizer.measureElement}
+              data-index={row.index}
+              className="absolute left-0 top-0 w-full pb-2"
+              style={{ transform: `translateY(${row.start}px)` }}
+            >
+              {renderCard(suggestion)}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+interface SuggestionCardProps {
+  suggestion: SuggestionResponse;
+  status: SuggestionStatus;
+  issue: SuggestionIssue | undefined;
+  selected: boolean;
+  unsaved: boolean;
+  onSelect: (id: string) => void;
+}
+
+const SuggestionCard = memo(function SuggestionCard({
+  suggestion: s,
+  status,
+  issue,
+  selected,
+  unsaved,
+  onSelect,
+}: SuggestionCardProps) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={() => onSelect(s.id)}
+      className={cn(
+        'w-full space-y-1.5 rounded-lg border bg-card p-3 text-left text-sm shadow-sm transition-colors hover:bg-accent/50',
+        selected && 'border-primary ring-1 ring-primary',
+      )}
+    >
+      <span className="flex items-center gap-2">
+        <ChangeTypeBadge type={s.change_type} />
+        {status !== 'pending' ? (
+          <span
+            className={cn(
+              'inline-flex items-center gap-1 text-xs font-medium',
+              status === 'accepted' ? 'text-emerald-700' : 'text-muted-foreground',
+            )}
+          >
+            {status === 'accepted' ? <CheckCircle2 className="size-3" aria-hidden /> : null}
+            {decisionLabel[status]}
+            {unsaved ? ' · не сохранено' : ''}
+          </span>
+        ) : null}
+        {issue ? (
+          <TriangleAlert
+            className="ml-auto size-4 shrink-0 text-amber-600"
+            aria-label={ISSUE_TEXTS[issue]}
+          />
+        ) : null}
+      </span>
+      <span className="line-clamp-2 block break-words">{shortText(s)}</span>
+      {s.section_ref ? (
+        <span className="block truncate text-xs text-muted-foreground">
+          Раздел: {s.section_ref}
+        </span>
+      ) : null}
+    </button>
+  );
+});
