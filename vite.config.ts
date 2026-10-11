@@ -34,7 +34,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     test: {
-      environment: 'jsdom',
+      // Кастомное окружение = jsdom + Node-реализации AbortController/AbortSignal/Headers/URL,
+      // иначе на Node 22+ undici отвергает jsdom-сигнал (см. src/test/environment.ts).
+      environment: './src/test/environment.ts',
       globals: false,
       setupFiles: ['./src/test/setup.ts'],
       // В jsdom fetch требует абсолютный URL; MSW резолвит относительные пути хендлеров
