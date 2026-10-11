@@ -13,8 +13,10 @@
 
 - `feat(ui): add atmospheric sidebar treatment`, `style(ui): add sidebar gradient atmosphere` — CSS-only фиолетово-синий градиент в sidebar (`.sidebar-atmosphere`, псевдоэлементы, `pointer-events: none`), усиленные active/hover пунктов меню. Разделы «Шаблоны», «Архив», «Помощь» не добавлялись.
 - `feat(projects): align cards with visual reference` — карточки проектов: цветовой верхний акцент из `projectColor`, счётчики с иконками, меню всегда видимо на touch, сетка `sm:2 / xl:3`.
-- `perf(app): lazy-load route pages` — все страницы через `React.lazy` + `Suspense` с `PageFallback`; DocumentPage и `features/editor` ожидаемо уходят в отдельный chunk (анализом build не подтверждено).
+- `fix(projects): restore card copy and decorative layer order` — возвращён текст «Без описания» из описания UI; декоративные слои перенесены в конец разметки (`isolate` + `-z-10`), чтобы иконка оставалась первым элементом с inline-стилем; оверлей ссылки снова покрывает всю карточку.
+- `perf(app): lazy-load route pages` — все страницы через `React.lazy` + `Suspense` с `PageFallback`. `vite build` подтвердил разделение: `DocumentPage` (редактор) — отдельный chunk 35,6 kB, остальные страницы 0,5–12,5 kB, стартовый `index` 205 kB.
 - `feat(editor): sticky toolbar and live review status` — sticky-тулбар редактора, правая панель смещена под него, скрытая `aria-live` область для сохранения / конфликта / ошибки / числа несохранённых решений.
+- `style: …` (три коммита) — приведение к prettier: markdown-таблицы в отчёте заменены списками; `sr-only`-область prettier печатает в три строки (открывающий тег, `{liveStatus}`, закрывающий тег).
 
 ## Что уже было и не переделывалось
 
@@ -24,10 +26,11 @@
 
 ## Решения
 
-- **Виртуализация списка предложений.** `@tanstack/react-virtual` не добавлен: в текущем окружении нет `npm install`, а правка `package.json` без `package-lock.json` сломает CI. Сохранён инкрементальный рендер по 100 карточек (`SUGGESTIONS_RENDER_STEP`). Зависимость добавляется отдельным коммитом с локальным `npm install` и обновлённым lock-файлом.
+- **Виртуализация списка предложений.** `@tanstack/react-virtual` не добавлен: правка `package.json` без обновлённого `package-lock.json` сломает `npm ci` в CI. Сохранён инкрементальный рендер по 100 карточек (`SUGGESTIONS_RENDER_STEP`). Зависимость добавляется отдельным коммитом с локальным `npm install`.
 - **Редактирование `suggested_text`.** Не реализовано на фронте: контракт `PUT …/suggestions/review` не принимает текст. Локальная имитация сохранения запрещена. Заведён issue DITLEKS/SyncBack#69.
 - **Dark mode** не вводится — нет в требованиях.
 - **aria-live тексты** намеренно не совпадают с видимыми баннерами, чтобы не дублировать озвучку и не ломать `getByText` в тестах.
+- **Декоративные слои карточек** идут после содержательной разметки: тесты и скринридеры видят сначала данные, потом декор.
 
 ## Расхождения макетов и API
 
@@ -39,16 +42,16 @@
 
 ## Проверки
 
-Коммиты шага 5 внесены через GitHub API без локального окружения Node. `npm run format:check`, `typecheck`, `lint`, `test`, `build` локально **не запускались** — источник истины по проверкам — CI job `check` на PR #6.
-
-История CI: на `48051eb` и `aa471fb` `format:check` падал на этом отчёте (prettier выравнивает markdown-таблицы) и на `EditorScreen.tsx`; таблицы заменены списками, классы шапки редактора упрощены.
-
-Реальный SyncBack не запускался; интеграция с бэкендом не проверялась.
+- CI (`.github/workflows/ci.yml`, Node 20) на `5a615c3`: `format:check`, `typecheck`, `lint`, `test`, `build` — зелёные.
+- Локально на macOS с Node 24.7: `format:check`, `typecheck`, `lint`, `build` зелёные; `test` — 161/175, 14 падений и 15 unhandled rejections с одной причиной: `RequestInit: Expected signal to be an instance of AbortSignal` в `@remix-run/router → createClientSideRequest` через `@mswjs/interceptors`. Это несовместимость jsdom-`AbortSignal` с undici в Node 22+, не дефект ветки. Для локальных тестов нужен Node 20.
+- История CI ветки: на `48051eb`…`419e6c3` падал `format:check` (markdown-таблицы и JSX-формат `sr-only`); на локальном прогоне до `9af86ed` падали два теста `projects.test.tsx` из-за регрессов карточки.
+- Реальный SyncBack не запускался; интеграция с бэкендом и ручной smoke не проверялись. Скриншотов нет.
 
 ## Что проверить вручную
 
 - Переходы между разделами: короткий skeleton `PageFallback`, отдельные chunk в Network.
 - Редактор на длинном тексте: тулбар остаётся вверху, правая панель не перекрывается им на `lg+`.
+- Карточка проекта: клик по футеру со счётчиками открывает проект, меню «…» — нет; градиент и полоска видны.
 - Скринридер (VoiceOver/NVDA): озвучка «Идёт сохранение решений» и «Несохранённых решений: N».
 - 390×844: sticky-тулбар не занимает больше половины экрана при переносе кнопок.
 
@@ -56,6 +59,7 @@
 
 1. `feat(documents)`: таблица «Мои документы» — сверка колонок с макетом, mobile-раскладка, единый `statusMeta`.
 2. `feat(project)`: страница проекта — блок источников и строки документов по макету, 423.
-3. `perf(editor)`: `@tanstack/react-virtual` после локального `npm install`.
-4. `test(ui)`: RTL на фильтры документов и меню карточки, MSW 413/415/422/423, smoke login → export.
-5. Скриншоты desktop/mobile в PR.
+3. `chore`: `.nvmrc` с `20` и сужение `engines` до `20.x`; отдельно — устойчивость тестов к Node 22+ (нативный `AbortSignal` в setup или обновление msw/jsdom).
+4. `perf(editor)`: `@tanstack/react-virtual` после локального `npm install`.
+5. `test(ui)`: RTL на фильтры документов и меню карточки, MSW 413/415/422/423, smoke login → export.
+6. Скриншоты desktop/mobile в PR.
