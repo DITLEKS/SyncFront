@@ -65,7 +65,7 @@
 - PR #8, локально на Node 20: 30 файлов / 177 тестов зелёные (ветка от `main`).
   CI на `74949d9` и на `48b6fc8`/`3b7a999`: `check` (Node 20), `check-node-next (22)`,
   `check-node-next (24)` — зелёные. Падение `RequestInit: Expected signal to be an
-  instance of AbortSignal` на Node 24 воспроизводилось в шаге 5 и больше не воспроизводится.
+instance of AbortSignal` на Node 24 воспроизводилось в шаге 5 и больше не воспроизводится.
 - Предупреждения, не влияющие на результат: React Router `v7_startTransition` в stderr
   тестов; Rollup удаляет некорректно расположенные `@__PURE__`-аннотации из Zod при build.
 - Реальный SyncBack не запускался; интеграция и ручной smoke не проверялись. Скриншотов нет.
