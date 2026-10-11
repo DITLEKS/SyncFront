@@ -23,6 +23,7 @@ interface ProjectCardProps {
 /**
  * Вся карточка — ссылка на проект; меню лежит поверх ссылки отдельным элементом,
  * поэтому клик по нему не открывает проект. Меню видно при наведении и при фокусе с клавиатуры.
+ * Декоративные слои (полоска цвета и градиент) лежат в конце разметки и не участвуют в hit-testing.
  */
 export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
   const documents = project.document_count;
@@ -30,19 +31,8 @@ export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
   const color = projectColor(project);
 
   return (
-    <article className="group relative flex min-h-64 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-200 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:-translate-y-0.5 hover:border-border hover:shadow-md motion-reduce:hover:translate-y-0">
-      <div
-        className="absolute inset-x-0 top-0 z-10 h-0.5"
-        style={{ backgroundColor: color }}
-        aria-hidden
-      />
-
-      <div
-        className="relative flex flex-1 flex-col px-5 pb-5 pt-6"
-        style={{
-          background: `linear-gradient(145deg, ${color}14 0%, ${color}08 45%, transparent 76%)`,
-        }}
-      >
+    <article className="group relative isolate flex min-h-64 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-200 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:-translate-y-0.5 hover:border-border hover:shadow-md motion-reduce:hover:translate-y-0">
+      <div className="flex flex-1 flex-col px-5 pb-5 pt-6">
         <div className="flex items-start gap-4 pr-8">
           <ProjectIcon
             project={project}
@@ -64,7 +54,7 @@ export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
         </div>
 
         <p className="mt-5 line-clamp-3 min-h-[3.75rem] text-sm leading-5 text-muted-foreground">
-          {project.description || 'В проекте пока нет описания.'}
+          {project.description || 'Без описания'}
         </p>
       </div>
 
@@ -116,6 +106,19 @@ export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <div
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{
+          background: `linear-gradient(145deg, ${color}14 0%, ${color}08 45%, transparent 76%)`,
+        }}
+        aria-hidden
+      />
+      <div
+        className="absolute inset-x-0 top-0 z-10 h-0.5"
+        style={{ backgroundColor: color }}
+        aria-hidden
+      />
     </article>
   );
 }
