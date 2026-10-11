@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { DocumentListItem } from '@/api/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState, ErrorState } from '@/components/ui/state';
@@ -139,8 +140,8 @@ export function MyDocumentsView({ renderHeader }: MyDocumentsViewProps) {
       ) : (
         <>
           <div className="overflow-x-auto rounded-lg border bg-card">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+            <table className="w-full min-w-[40rem] text-sm">
+              <thead className="border-b bg-muted/40 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th scope="col" className="px-4 py-2.5">
                     Документ
@@ -235,6 +236,8 @@ interface DocumentRowProps {
 function DocumentRow({ document: doc, onOpen, onDelete }: DocumentRowProps) {
   const href = `/projects/${doc.project.id}/documents/${doc.id}`;
   const changes = suggestionsSummary(doc.suggestions);
+  const reviewLabel =
+    changes.kind === 'some' ? `Рассмотрено ${changes.resolved} из ${changes.total}` : undefined;
   const canDelete = documentPolicy.canDelete(doc.status);
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
@@ -267,7 +270,18 @@ function DocumentRow({ document: doc, onOpen, onDelete }: DocumentRowProps) {
         </Link>
       </td>
       <td className="px-4 py-2.5 text-right tabular-nums">
-        {changes.kind === 'none' ? <span className="text-muted-foreground">—</span> : changes.total}
+        {changes.kind === 'none' ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <div className="flex items-center justify-end gap-2" title={reviewLabel}>
+            <Progress
+              value={changes.progress}
+              label={reviewLabel ?? ''}
+              className="w-10 shrink-0"
+            />
+            <span className="font-medium text-primary">{changes.total}</span>
+          </div>
+        )}
       </td>
       <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-muted-foreground">
         {formatBytes(doc.size_bytes)}
