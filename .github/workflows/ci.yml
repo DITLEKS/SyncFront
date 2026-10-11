@@ -20,3 +20,22 @@ jobs:
       - run: npm run lint
       - run: npm run test
       - run: npm run build
+
+  # Тесты должны проходить и на новых Node: undici в Node 22+ строже проверяет AbortSignal
+  # (см. src/test/environment.ts). Основная job остаётся на Node 20 из .nvmrc/engines.
+  check-node-next:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test
