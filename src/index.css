@@ -31,30 +31,34 @@
   src: url('./assets/fonts/inter-700.woff2') format('woff2');
 }
 
-/* Светлая палитра Figma Make, адаптированная к HSL-токенам Tailwind 3. */
+/*
+ * Арт-направление SyncScribe: спокойный инструмент для работы с документацией.
+ * Нейтральные тёплые поверхности, один индиго-акцент и лёгкая атмосферная
+ * графика только в оболочке приложения. Доменная семантика статусов остаётся
+ * функциональной: зелёный / жёлтый / красный используются только по назначению.
+ */
 @layer base {
   :root {
-    --background: 48 18.5% 94.7%;
-    --foreground: 255 8.3% 9.4%;
+    --background: 225 25% 97.5%;
+    --foreground: 238 28% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 255 8.3% 9.4%;
+    --card-foreground: 238 28% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 255 8.3% 9.4%;
-    --primary: 238.7 83.5% 66.7%;
+    --popover-foreground: 238 28% 12%;
+    --primary: 243 75% 59%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 48 15.2% 93.5%;
-    --secondary-foreground: 252 4.4% 22.2%;
-    --muted: 48 16.1% 93.9%;
-    --muted-foreground: 253.3 4.1% 43.3%;
-    --accent: 225.9 100% 96.7%;
-    --accent-foreground: 244.5 57.9% 50.6%;
-    /* Более тёмный цвет кнопок сохраняет контраст белого текста. */
+    --secondary: 226 25% 95%;
+    --secondary-foreground: 235 18% 25%;
+    --muted: 225 24% 95.5%;
+    --muted-foreground: 230 10% 43%;
+    --accent: 232 100% 96.5%;
+    --accent-foreground: 244 58% 49%;
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
-    --border: 255 8.3% 9.4% / 0.07;
-    --input: 255 8.3% 9.4% / 0.12;
-    --ring: 238.7 83.5% 66.7%;
-    --radius: 0.5rem;
+    --border: 236 22% 16% / 0.08;
+    --input: 236 22% 16% / 0.13;
+    --ring: 243 75% 59%;
+    --radius: 0.625rem;
   }
 
   * {
@@ -68,15 +72,50 @@
 
   body {
     @apply bg-background text-foreground;
+    font-variant-numeric: tabular-nums;
   }
 
-  /* Видимый фокус для клавиатурной навигации, без обводки при клике мышью. */
   :focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 }
 
-/* Анимации не должны мешать пользователям с reduced-motion. */
+/*
+ * Декоративный слой из макета рабочего пространства. Он не добавляет разделов
+ * и не участвует в семантике: мягкое свечение остаётся за контентом sidebar.
+ */
+.sidebar-atmosphere {
+  isolation: isolate;
+}
+
+.sidebar-atmosphere::before,
+.sidebar-atmosphere::after {
+  position: absolute;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+}
+
+.sidebar-atmosphere::before {
+  inset: 0;
+  background:
+    radial-gradient(circle at -12% 24%, hsl(252 92% 73% / 0.17), transparent 31%),
+    radial-gradient(circle at 112% 58%, hsl(210 96% 78% / 0.13), transparent 34%),
+    linear-gradient(180deg, hsl(0 0% 100% / 0.86), hsl(232 80% 98% / 0.66));
+}
+
+.sidebar-atmosphere::after {
+  left: -7rem;
+  bottom: 5rem;
+  width: 15rem;
+  height: 15rem;
+  border-radius: 3rem;
+  opacity: 0.24;
+  background: linear-gradient(135deg, hsl(252 90% 74% / 0.44), hsl(213 96% 82% / 0.08));
+  transform: rotate(42deg);
+  filter: blur(1px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

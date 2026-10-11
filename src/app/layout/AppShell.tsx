@@ -20,10 +20,10 @@ export function AppShell() {
 
   return (
     <RealtimeProvider>
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen bg-background">
         <Sidebar collapsed={collapsed} onToggle={toggle} />
-        <main className="min-w-0 flex-1">
-          <div className="mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-8">
+        <main id="main-content" className="min-w-0 flex-1">
+          <div className="mx-auto w-full max-w-[1600px] px-4 py-6 md:px-8 md:py-8 xl:px-10">
             <Outlet />
           </div>
         </main>
