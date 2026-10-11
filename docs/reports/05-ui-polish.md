@@ -1,7 +1,7 @@
 # Отчёт по шагу 5 — визуальная полировка (в работе)
 
 Дата: 11.10.2026. Ветка: `feat/step-5-ui-polish` (от `main @ f951c2b`), PR #6 (draft).
-Бэкенд: `DITLEKS/SyncBack main`, контракт не менялся с шага 4.
+Бэкенд: `DITLEKS/SyncBack main`; повторная сверка контракта с момента шага 4 не проводилась.
 
 ## Источники истины
 
@@ -11,12 +11,10 @@
 
 ## Что сделано в ветке
 
-| Коммит | Содержание |
-| --- | --- |
-| `feat(ui): add atmospheric sidebar treatment`, `style(ui): add sidebar gradient atmosphere` | CSS-only фиолетово-синий градиент в sidebar (`.sidebar-atmosphere`, псевдоэлементы, `pointer-events: none`), усиленные active/hover пунктов меню. Разделы «Шаблоны», «Архив», «Помощь» не добавлялись. |
-| `feat(projects): align cards with visual reference` | Карточки проектов: цветовой верхний акцент из `projectColor`, счётчики с иконками, меню всегда видимо на touch, сетка `sm:2 / xl:3`. |
-| `perf(app): lazy-load route pages` | Все страницы через `React.lazy` + `Suspense` с `PageFallback`; DocumentPage и `features/editor` уходят в отдельный chunk. |
-| `feat(editor): sticky toolbar and live review status` | Sticky-тулбар редактора, правая панель смещена под него, скрытая `aria-live` область для сохранения / конфликта / ошибки / числа несохранённых решений. |
+- `feat(ui): add atmospheric sidebar treatment`, `style(ui): add sidebar gradient atmosphere` — CSS-only фиолетово-синий градиент в sidebar (`.sidebar-atmosphere`, псевдоэлементы, `pointer-events: none`), усиленные active/hover пунктов меню. Разделы «Шаблоны», «Архив», «Помощь» не добавлялись.
+- `feat(projects): align cards with visual reference` — карточки проектов: цветовой верхний акцент из `projectColor`, счётчики с иконками, меню всегда видимо на touch, сетка `sm:2 / xl:3`.
+- `perf(app): lazy-load route pages` — все страницы через `React.lazy` + `Suspense` с `PageFallback`; DocumentPage и `features/editor` ожидаемо уходят в отдельный chunk (анализом build не подтверждено).
+- `feat(editor): sticky toolbar and live review status` — sticky-тулбар редактора, правая панель смещена под него, скрытая `aria-live` область для сохранения / конфликта / ошибки / числа несохранённых решений.
 
 ## Что уже было и не переделывалось
 
@@ -33,17 +31,17 @@
 
 ## Расхождения макетов и API
 
-| # | Макет | Как сделано |
-| --- | --- | --- |
-| U-1 | Разделы «Шаблоны», «Архив», «Помощь» | Не добавлены (нет в контракте и требованиях) |
-| U-2 | Растровый горный фон в шапке рабочего пространства | Только CSS-градиент в sidebar |
-| U-3 | PDF/PPTX в списке документов проекта | Форматы и лимит берутся из `/system/capabilities` |
-| U-4 | Редактируемое поле «Добавляемый текст» в карточке правки | Read-only до SyncBack#69 |
-| U-5 | Источник правки («JIRA-1234», «Confluence / …») | Нет в `SuggestionResponse` (B-12), показывается `section_ref` |
+- U-1. Разделы «Шаблоны», «Архив», «Помощь» — не добавлены (нет в контракте и требованиях).
+- U-2. Растровый горный фон в шапке рабочего пространства — только CSS-градиент в sidebar.
+- U-3. PDF/PPTX в списке документов проекта — форматы и лимит берутся из `/system/capabilities`.
+- U-4. Редактируемое поле «Добавляемый текст» в карточке правки — read-only до SyncBack#69.
+- U-5. Источник правки («JIRA-1234», «Confluence / …») — нет в `SuggestionResponse` (B-12 в отчёте шага 4), показывается `section_ref`.
 
 ## Проверки
 
-Коммиты `perf(app)` и `feat(editor)` внесены через GitHub API без локального окружения Node. `npm run format:check`, `typecheck`, `lint`, `test`, `build` **не запускались** для этих коммитов — результат нужно снять с CI PR #6 или локально перед снятием draft. Особое внимание: prettier может перенести длинные `className` в `EditorScreen.tsx` и `router.tsx` — в этом случае достаточно `npm run format`.
+Коммиты шага 5 внесены через GitHub API без локального окружения Node. `npm run format:check`, `typecheck`, `lint`, `test`, `build` локально **не запускались** — источник истины по проверкам — CI job `check` на PR #6.
+
+История CI: на `48051eb` и `aa471fb` `format:check` падал на этом отчёте (prettier выравнивает markdown-таблицы) и на `EditorScreen.tsx`; таблицы заменены списками, классы шапки редактора упрощены.
 
 Реальный SyncBack не запускался; интеграция с бэкендом не проверялась.
 

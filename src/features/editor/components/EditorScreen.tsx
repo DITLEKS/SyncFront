@@ -111,7 +111,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-b bg-background/95 px-4 pb-4 pt-2 backdrop-blur-sm supports-[backdrop-filter]:bg-background/80 md:-mx-8 md:px-8">
+      <header className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-b bg-background/95 px-4 pb-4 pt-2 backdrop-blur-sm md:-mx-8 md:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <Button size="icon" variant="ghost" onClick={goBack} aria-label="Назад">
             <ArrowLeft aria-hidden />
