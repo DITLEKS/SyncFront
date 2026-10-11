@@ -85,7 +85,7 @@ export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="size-9 rounded-lg bg-card/70 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-card hover:text-foreground"
+              className="rounded-lg bg-card/70 text-muted-foreground shadow-sm backdrop-blur-sm hover:bg-card hover:text-foreground"
               aria-label={`Действия с проектом ${project.name}`}
             >
               <MoreHorizontal aria-hidden />
