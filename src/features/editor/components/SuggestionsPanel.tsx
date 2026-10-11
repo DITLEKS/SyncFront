@@ -1,4 +1,4 @@
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { observeElementRect, useVirtualizer } from '@tanstack/react-virtual';
 import { CheckCircle2, Inbox, TriangleAlert } from 'lucide-react';
 import { memo, useEffect, useRef, useState } from 'react';
 
@@ -11,7 +11,12 @@ import type { ReviewProgress } from '@/domain/editor/review';
 import { decisionLabel, type SuggestionStatus } from '@/domain/editor/suggestion';
 import { cn } from '@/lib/cn';
 
-import { ESTIMATED_CARD_HEIGHT, isVirtualized, LIST_OVERSCAN } from '../model/suggestionList';
+import {
+  ESTIMATED_CARD_HEIGHT,
+  FALLBACK_VIEWPORT_HEIGHT,
+  isVirtualized,
+  LIST_OVERSCAN,
+} from '../model/suggestionList';
 import { EMPTY_FILTER_TEXTS, ISSUE_TEXTS } from '../model/texts';
 
 import { ChangeTypeBadge } from './ChangeTypeBadge';
@@ -121,6 +126,11 @@ function VirtualSuggestionList({ items, selectedId, renderCard }: VirtualSuggest
     estimateSize: () => ESTIMATED_CARD_HEIGHT,
     overscan: LIST_OVERSCAN,
     getItemKey: (index) => items[index]?.id ?? index,
+    // Неизмеренный контейнер (0 px) не должен оставлять панель пустой.
+    observeElementRect: (instance, cb) =>
+      observeElementRect(instance, (rect) =>
+        cb(rect.height > 0 ? rect : { width: rect.width, height: FALLBACK_VIEWPORT_HEIGHT }),
+      ),
   });
 
   // Правка, выбранная кликом по тексту, должна оказаться в видимой части списка.
