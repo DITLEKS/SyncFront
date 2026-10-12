@@ -1,4 +1,4 @@
-import { Check, Pencil, X } from 'lucide-react';
+import { Check, Pencil, Undo2, X } from 'lucide-react';
 import { memo } from 'react';
 
 import type { ChangeSegment, Segment } from '@/domain/editor/projection';
@@ -13,6 +13,8 @@ interface DocumentTextProps {
   segments: Segment[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Быстрая отмена решения с блока в тексте (кнопка «Отмена» при наведении). */
+  onUndo?: (id: string) => void;
 }
 
 /**
@@ -38,6 +40,7 @@ export function DocumentText({
   segments,
   selectedId,
   onSelect,
+  onUndo,
 }: DocumentTextProps) {
   return (
     <div
@@ -57,6 +60,7 @@ export function DocumentText({
                 block={segment.changeType === 'add' || occupiesParagraph(segments, index)}
                 selected={segment.id === selectedId}
                 onSelect={onSelect}
+                onUndo={onUndo}
               />
             ),
           )}
@@ -75,6 +79,7 @@ interface ChangePartProps {
   block: boolean;
   selected: boolean;
   onSelect: (id: string) => void;
+  onUndo?: (id: string) => void;
 }
 
 // Заголовок нерассмотренной блочной правки по макету: иконка + глагол. Доступное имя — из changeTypeMeta.
@@ -107,36 +112,36 @@ const pendingTone = {
   },
 } as const;
 
-// Принятые: изменение и добавление — зелёный блок с новым текстом, удаление — зачёркнуто.
+// Принятые (режим «Правки»): изменение и добавление — зелёный блок, удаление — зачёркнуто.
 const acceptedTone = {
   modify: { block: 'border-l-4 border-l-emerald-400 bg-emerald-50/60', inline: 'bg-emerald-50' },
   add: { block: 'border-l-4 border-l-emerald-400 bg-emerald-50/60', inline: 'bg-emerald-50' },
   delete: { block: 'bg-red-50/40', inline: '' },
 } as const;
 
-// Отклонённые: исходный текст без акцента, но блок остаётся кликабельным — чтобы отменить решение.
+// Отклонённые (режим «Правки»): исходный текст без акцента.
 const rejectedTone = { block: 'border-l-4 border-l-border bg-muted/30', inline: 'bg-muted/40' };
 
+// Рассмотренные в «Чистовике»: как обычный текст, подсветка только при наведении.
+const quietTone = { block: 'hover:bg-muted/30', inline: 'hover:bg-muted/40' };
+
 const ChangePart = memo(
-  function ChangePart({ segment, mode, block, selected, onSelect }: ChangePartProps) {
+  function ChangePart({ segment, mode, block, selected, onSelect, onUndo }: ChangePartProps) {
     const { changeType, status, oldText, newText } = segment;
+    const decided = status !== 'pending';
+    // В «Чистовике» рассмотренные правки не подсвечиваются; нерассмотренные размечены как в «Правках».
+    const quiet = mode === 'clean' && decided;
 
-    // «Чистовик» — как в экспорте: принятые правки применены, остальные — исходный текст. Без разметки.
-    if (mode === 'clean') {
-      const applied = status === 'accepted';
-      if (changeType === 'add') return applied ? <span className="block">{newText}</span> : null;
-      if (changeType === 'delete') return applied ? null : <>{oldText}</>;
-      return <>{applied ? newText : oldText}</>;
-    }
-
-    // Отклонённое добавление в документе не показывается; оно доступно из панели «Решено».
+    // Отклонённое добавление и принятое удаление в «Чистовике» в тексте не показываются;
+    // они доступны из панели «Решено».
     if (changeType === 'add' && status === 'rejected') return null;
+    if (quiet && changeType === 'delete' && status === 'accepted') return null;
 
     const meta = changeTypeMeta[changeType];
-    const decided = status !== 'pending';
     const label = `${meta.label}${decided ? `, ${decisionLabel[status].toLowerCase()}` : ''}`;
-    const toneClass =
-      status === 'pending'
+    const toneClass = quiet
+      ? quietTone
+      : status === 'pending'
         ? pendingTone[changeType]
         : status === 'accepted'
           ? acceptedTone[changeType]
@@ -157,9 +162,9 @@ const ChangePart = memo(
           }
         }}
         className={cn(
-          'cursor-pointer outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring',
+          'group relative cursor-pointer outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring',
           block
-            ? cn('my-3 block rounded-lg px-4 py-3', toneClass.block)
+            ? cn('block rounded-lg', quiet ? 'my-0' : 'my-3 px-4 py-3', toneClass.block)
             : cn('rounded-sm box-decoration-clone px-1 py-0.5', toneClass.inline),
           selected && 'ring-2 ring-primary ring-offset-1',
         )}
@@ -168,7 +173,12 @@ const ChangePart = memo(
           <PendingContent changeType={changeType} block={block} oldText={oldText} newText={newText} />
         ) : status === 'accepted' ? (
           changeType === 'delete' ? (
-            <del className={cn('text-red-700/70 line-through decoration-red-400 decoration-2', block && 'block')}>
+            <del
+              className={cn(
+                'text-red-700/70 line-through decoration-red-400 decoration-2',
+                block && 'block',
+              )}
+            >
               {oldText}
             </del>
           ) : (
@@ -177,6 +187,26 @@ const ChangePart = memo(
         ) : (
           <span className={cn(block && 'block')}>{oldText}</span>
         )}
+        {decided && onUndo ? (
+          // Быстрая отмена: не открывает карточку, поэтому события не всплывают к блоку.
+          <button
+            type="button"
+            aria-label="Отменить решение"
+            title="Отменить решение"
+            onClick={(event) => {
+              event.stopPropagation();
+              onUndo(segment.id);
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-md border bg-card font-sans text-xs text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100',
+              block ? 'absolute right-2 top-2 px-2 py-0.5' : 'ml-1 px-1 align-middle',
+            )}
+          >
+            <Undo2 className="size-3.5" aria-hidden />
+            {block ? 'Отмена' : null}
+          </button>
+        ) : null}
       </span>
     );
   },
@@ -185,6 +215,7 @@ const ChangePart = memo(
     prev.block === next.block &&
     prev.selected === next.selected &&
     prev.onSelect === next.onSelect &&
+    prev.onUndo === next.onUndo &&
     prev.segment.status === next.segment.status &&
     prev.segment.oldText === next.segment.oldText &&
     prev.segment.newText === next.segment.newText &&

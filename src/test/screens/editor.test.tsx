@@ -92,12 +92,11 @@ describe('Редактор правок', () => {
     expect(within(await documentText()).queryByRole('button')).not.toBeInTheDocument();
     expect(await documentText()).toHaveTextContent('Срок ответа — 10 дней.');
 
-    // «Чистовик» — как в экспорте: нерассмотренные правки не применены и не размечены.
+    // В «Чистовике» нерассмотренные правки размечены как в «Правках».
     await user.click(screen.getByRole('radio', { name: 'Чистовик' }));
     const clean = await documentText();
-    expect(within(clean).queryByRole('button')).not.toBeInTheDocument();
-    expect(clean).toHaveTextContent('Срок ответа — 10 дней.');
-    expect(clean).toHaveTextContent('Оплата картой.');
+    expect(within(clean).getByRole('button', { name: 'Изменение' })).toBeInTheDocument();
+    expect(within(clean).getByRole('button', { name: 'Удаление' })).toBeInTheDocument();
   });
 
   it('принимает правку из карточки и сохраняет решение с If-Match', async () => {
@@ -120,7 +119,10 @@ describe('Редактор правок', () => {
     await user.click(screen.getByRole('radio', { name: 'Чистовик' }));
     const clean = await documentText();
     expect(clean).toHaveTextContent('Срок ответа — 14 дней.');
-    expect(within(clean).queryByRole('button')).not.toBeInTheDocument();
+    // Принятая правка без подсветки, но с быстрой отменой; нерассмотренное удаление размечено.
+    expect(within(clean).getByRole('button', { name: 'Изменение, принято' })).toBeInTheDocument();
+    expect(within(clean).getByRole('button', { name: 'Отменить решение' })).toBeInTheDocument();
+    expect(within(clean).getByRole('button', { name: 'Удаление' })).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: /^Сохранить$/ })[0]!);
     await waitFor(() => expect(reviewRequests()).toHaveLength(1));

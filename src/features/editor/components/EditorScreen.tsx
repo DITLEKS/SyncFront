@@ -96,6 +96,19 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     });
   }, []);
 
+  // Отмена решения — из карточки или кнопкой на блоке в тексте. Несохранённое снимается локально,
+  // сохранённое — запросом на возврат в pending.
+  const undo = useCallback(
+    (id: string) => {
+      if (model.decisions[id]) {
+        model.undoBuffered(id);
+        return;
+      }
+      resetDecisions.mutate([id], { onError: (error) => toast.error(getErrorMessage(error)) });
+    },
+    [model.decisions, model.undoBuffered, resetDecisions],
+  );
+
   // Выбранная правка исчезла (новый анализ): закрываем карточку.
   useEffect(() => {
     if (selectedId && !selected) setSelectedId(null);
@@ -170,14 +183,6 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     const outcome = await model.saveDecisions();
     if (outcome === 'saved') toast.success('Изменения сохранены');
     return outcome;
-  };
-
-  const undo = (id: string) => {
-    if (model.decisions[id]) {
-      model.undoBuffered(id);
-      return;
-    }
-    resetDecisions.mutate([id], { onError: (error) => toast.error(getErrorMessage(error)) });
   };
 
   const allProcessed = progress.total > 0 && progress.pending === 0;
@@ -316,6 +321,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
                   segments={projection.segments}
                   selectedId={selectedId}
                   onSelect={setSelectedId}
+                  onUndo={undo}
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">Документ не содержит текста.</p>
