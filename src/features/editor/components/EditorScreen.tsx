@@ -53,10 +53,12 @@ const MODE_OPTIONS: { value: ViewMode; label: string; icon: React.ReactNode }[] 
   { value: 'clean', label: 'Чистовик', icon: <FileCheck aria-hidden /> },
 ];
 
-/** Та же точка, что и lg: у сетки редактора — с неё карточка «парит» над текстом под правкой. */
+/** Та же точка, что и lg: у сетки редактора — с неё карточка «парит» над текстом у правки. */
 const DESKTOP_QUERY = '(min-width: 1024px)';
 /** Ширина парящей карточки по макету (34rem); на узкой статье ужимается до её правого края. */
 const CARD_WIDTH = 544;
+/** Зазор между блоком правки и карточкой. */
+const CARD_GAP = 8;
 
 interface FloatingBox {
   top: number;
@@ -76,6 +78,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   const resetDecisions = useResetDecisions(projectId, meta.id);
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const textRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [floating, setFloating] = useState<FloatingBox | null>(null);
 
   const projection = mode === 'clean' ? model.projections.clean : model.projections.suggestions;
@@ -98,39 +101,64 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     if (selectedId && !selected) setSelectedId(null);
   }, [selectedId, selected]);
 
-  // На десктопе карточка «парит» над текстом сразу под выбранным блоком, не сдвигая ни текст,
+  // На десктопе карточка «парит» над текстом рядом с выбранным блоком, не сдвигая ни текст,
   // ни панель. На узком экране, в «Оригинале» и если фрагмент не найден — остаётся в правой панели.
   const canFloat = desktop && selected !== null && mode !== 'original';
-  useLayoutEffect(() => {
+
+  // Считаем позицию относительно обёртки статьи. По умолчанию карточка под блоком; если снизу
+  // она вышла бы за край статьи (и растянула страницу) — над блоком. Высота карточки
+  // известна только после её отрисовки, поэтому замер повторяется, когда она появилась.
+  const measure = useCallback(() => {
     const wrapper = textRef.current;
-    if (!canFloat || !selectedId || !wrapper) {
+    if (!wrapper || !selectedId) return;
+    const target = Array.from(wrapper.querySelectorAll<HTMLElement>('[data-suggestion-id]')).find(
+      (element) => element.dataset.suggestionId === selectedId,
+    );
+    if (!target) {
+      setFloating(null);
+      return;
+    }
+    const rect = target.getBoundingClientRect();
+    const base = wrapper.getBoundingClientRect();
+    const cardHeight = cardRef.current?.offsetHeight ?? 0;
+    const left = Math.round(Math.max(0, rect.left - base.left));
+    const width = Math.round(Math.min(CARD_WIDTH, base.width - left));
+    const below = rect.bottom - base.top + CARD_GAP;
+    const above = rect.top - base.top - CARD_GAP - cardHeight;
+    const fitsBelow = below + cardHeight <= base.height;
+    const top = Math.round(fitsBelow || above < 0 ? below : above);
+    setFloating((prev) =>
+      prev && prev.top === top && prev.left === left && prev.width === width
+        ? prev
+        : { top, left, width },
+    );
+  }, [selectedId]);
+
+  useLayoutEffect(() => {
+    if (!canFloat) {
       setFloating(null);
       return undefined;
     }
-    const measure = () => {
-      const target = Array.from(wrapper.querySelectorAll<HTMLElement>('[data-suggestion-id]')).find(
-        (element) => element.dataset.suggestionId === selectedId,
-      );
-      if (!target) {
-        setFloating(null);
-        return;
-      }
-      const rect = target.getBoundingClientRect();
-      const base = wrapper.getBoundingClientRect();
-      const left = Math.max(0, rect.left - base.left);
-      setFloating({
-        top: Math.round(rect.bottom - base.top + 8),
-        left: Math.round(left),
-        width: Math.round(Math.min(CARD_WIDTH, base.width - left)),
-      });
-    };
     measure();
-    if (typeof ResizeObserver === 'undefined') return undefined;
+    const wrapper = textRef.current;
+    if (typeof ResizeObserver === 'undefined' || !wrapper) return undefined;
     const observer = new ResizeObserver(measure);
     observer.observe(wrapper);
     return () => observer.disconnect();
-  }, [canFloat, selectedId, projection]);
+  }, [canFloat, measure, projection]);
+
   const popover = canFloat && floating !== null;
+
+  // Карточка появилась или сменила высоту — перепроверяем, помещается ли она снизу, до отрисовки кадра.
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    if (!popover || !card) return undefined;
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [popover, measure]);
 
   const goBack = () => {
     // key 'default' у первой записи истории: страницу открыли по ссылке, назад некуда.
@@ -296,6 +324,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
             {popover ? (
               // z-[5] — ниже sticky-шапки (z-10): при прокрутке карточка уходит под неё.
               <div
+                ref={cardRef}
                 className="absolute z-[5]"
                 style={{ top: floating.top, left: floating.left, width: floating.width }}
               >
