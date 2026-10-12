@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 
 import type { ChangeSegment, Segment } from '@/domain/editor/projection';
 import { changeTypeMeta, decisionLabel } from '@/domain/editor/suggestion';
@@ -12,6 +12,8 @@ interface DocumentTextProps {
   segments: Segment[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Карточка выбранной правки; раскрывается в тексте сразу под абзацем с правкой. */
+  details?: ReactNode;
 }
 
 /**
@@ -37,6 +39,7 @@ export function DocumentText({
   segments,
   selectedId,
   onSelect,
+  details,
 }: DocumentTextProps) {
   return (
     <div
@@ -45,22 +48,64 @@ export function DocumentText({
     >
       {mode === 'original'
         ? originalText
-        : segments.map((segment, index) =>
-            segment.kind === 'text' ? (
-              <TextPart key={`t${index}`} text={segment.text} />
-            ) : (
-              <ChangePart
-                key={segment.id}
-                segment={segment}
-                mode={mode}
-                block={segment.changeType === 'add' || occupiesParagraph(segments, index)}
-                selected={segment.id === selectedId}
-                onSelect={onSelect}
-              />
-            ),
-          )}
+        : renderSegments(mode, segments, selectedId, onSelect, details)}
     </div>
   );
+}
+
+/**
+ * Карточка правки встраивается в поток текста: после блочной правки — сразу, после
+ * инлайновой — в конце её абзаца, чтобы не разрывать предложение.
+ */
+function renderSegments(
+  mode: Exclude<ViewMode, 'original'>,
+  segments: Segment[],
+  selectedId: string | null,
+  onSelect: (id: string) => void,
+  details: ReactNode,
+): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const card = details ? (
+    <div key="details" className="my-3 font-sans leading-normal whitespace-normal">
+      {details}
+    </div>
+  ) : null;
+  let awaitingParagraphEnd = false;
+
+  segments.forEach((segment, index) => {
+    if (segment.kind === 'text') {
+      const cut = awaitingParagraphEnd ? segment.text.indexOf('\n') : -1;
+      if (cut === -1) {
+        nodes.push(<TextPart key={`t${index}`} text={segment.text} />);
+        return;
+      }
+      // Перенос строки заменяет карточка: она блочная и сама отделяет абзацы.
+      nodes.push(<TextPart key={`t${index}a`} text={segment.text.slice(0, cut)} />);
+      nodes.push(card);
+      nodes.push(<TextPart key={`t${index}b`} text={segment.text.slice(cut + 1)} />);
+      awaitingParagraphEnd = false;
+      return;
+    }
+
+    const block = segment.changeType === 'add' || occupiesParagraph(segments, index);
+    nodes.push(
+      <ChangePart
+        key={segment.id}
+        segment={segment}
+        mode={mode}
+        block={block}
+        selected={segment.id === selectedId}
+        onSelect={onSelect}
+      />,
+    );
+    if (card && segment.id === selectedId) {
+      if (block) nodes.push(card);
+      else awaitingParagraphEnd = true;
+    }
+  });
+
+  if (awaitingParagraphEnd) nodes.push(card);
+  return nodes;
 }
 
 const TextPart = memo(function TextPart({ text }: { text: string }) {

@@ -11,7 +11,7 @@ import {
   Sparkles,
   TriangleAlert,
 } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -53,7 +53,7 @@ const MODE_OPTIONS: { value: ViewMode; label: string; icon: React.ReactNode }[] 
   { value: 'clean', label: 'Чистовик', icon: <FileCheck aria-hidden /> },
 ];
 
-/** Та же точка, что и lg: у сетки редактора — с неё карточка открывается рядом с правкой. */
+/** Та же точка, что и lg: у сетки редактора — с неё карточка раскрывается в тексте под правкой. */
 const DESKTOP_QUERY = '(min-width: 1024px)';
 
 export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) {
@@ -67,8 +67,6 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   const resetReview = useResetReview(projectId, meta.id);
   const resetDecisions = useResetDecisions(projectId, meta.id);
   const desktop = useMediaQuery(DESKTOP_QUERY);
-  const textRef = useRef<HTMLDivElement>(null);
-  const [anchorTop, setAnchorTop] = useState<number | null>(null);
 
   const projection = mode === 'clean' ? model.projections.clean : model.projections.suggestions;
   const selected = model.suggestions.find((s) => s.id === selectedId) ?? null;
@@ -90,33 +88,12 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     if (selectedId && !selected) setSelectedId(null);
   }, [selectedId, selected]);
 
-  // На десктопе карточка встаёт popover'ом на уровне подсвеченной правки. Если фрагмент
-  // в тексте не найден (или экран узкий) — остаётся в правой панели, как на мобильном.
-  const canAnchor = desktop && selected !== null && mode !== 'original';
-  useLayoutEffect(() => {
-    const wrapper = textRef.current;
-    if (!canAnchor || !selectedId || !wrapper) {
-      setAnchorTop(null);
-      return undefined;
-    }
-    const measure = () => {
-      const target = Array.from(wrapper.querySelectorAll<HTMLElement>('[data-suggestion-id]')).find(
-        (element) => element.dataset.suggestionId === selectedId,
-      );
-      if (!target) {
-        setAnchorTop(null);
-        return;
-      }
-      const top = target.getBoundingClientRect().top - wrapper.getBoundingClientRect().top;
-      setAnchorTop(Math.max(0, Math.round(top)));
-    };
-    measure();
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver(measure);
-    observer.observe(wrapper);
-    return () => observer.disconnect();
-  }, [canAnchor, selectedId, projection]);
-  const popover = canAnchor && anchorTop !== null;
+  // На десктопе карточка раскрывается в тексте под правкой (как в макете). На узком экране,
+  // в «Оригинале» и если фрагмент в тексте не найден — остаётся в правой панели.
+  const inText = projection.segments.some(
+    (segment) => segment.kind !== 'text' && segment.id === selectedId,
+  );
+  const inline = desktop && selected !== null && mode !== 'original' && inText;
 
   const goBack = () => {
     // key 'default' у первой записи истории: страницу открыли по ссылке, назад некуда.
@@ -265,30 +242,20 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
               <AlertDescription>{EDITOR_TEXTS.originalNotice}</AlertDescription>
             </Alert>
           ) : null}
-          <div ref={textRef} className="relative">
-            <article className="rounded-lg border bg-card px-6 py-5 shadow-sm sm:px-10 sm:py-8">
-              {model.content.plain_text ? (
-                <DocumentText
-                  mode={mode}
-                  originalText={model.content.plain_text}
-                  segments={projection.segments}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">Документ не содержит текста.</p>
-              )}
-            </article>
-            {popover ? (
-              // Ширина и отступ совпадают с правой колонкой сетки: карточка ложится поверх панели.
-              <div
-                className="absolute left-[calc(100%+1.5rem)] z-[1] w-[22rem] before:absolute before:-left-1.5 before:top-5 before:size-3 before:rotate-45 before:border-b before:border-l before:bg-card"
-                style={{ top: anchorTop }}
-              >
-                {details}
-              </div>
-            ) : null}
-          </div>
+          <article className="rounded-lg border bg-card px-6 py-5 shadow-sm sm:px-10 sm:py-8">
+            {model.content.plain_text ? (
+              <DocumentText
+                mode={mode}
+                originalText={model.content.plain_text}
+                segments={projection.segments}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                details={inline ? details : undefined}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">Документ не содержит текста.</p>
+            )}
+          </article>
         </section>
 
         <div className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
@@ -329,7 +296,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
                     </Alert>
                   )
                 ) : null}
-                {popover ? null : details}
+                {inline ? null : details}
               </>
             }
           />
