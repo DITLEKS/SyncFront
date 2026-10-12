@@ -119,7 +119,7 @@ describe('Редактор правок', () => {
     await user.click(screen.getByRole('radio', { name: 'Чистовик' }));
     const clean = await documentText();
     expect(clean).toHaveTextContent('Срок ответа — 14 дней.');
-    // Принятая правка без подсветки, но с быстрой отменой; нерассмотренное удаление размечено.
+    // Принятая правка — без подсветки, но с быстрой отменой; нерассмотренное удаление размечено.
     expect(within(clean).getByRole('button', { name: 'Изменение, принято' })).toBeInTheDocument();
     expect(within(clean).getByRole('button', { name: 'Отменить решение' })).toBeInTheDocument();
     expect(within(clean).getByRole('button', { name: 'Удаление' })).toBeInTheDocument();

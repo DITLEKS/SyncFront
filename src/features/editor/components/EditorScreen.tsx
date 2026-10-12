@@ -96,8 +96,8 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     });
   }, []);
 
-  // Отмена решения — из карточки или кнопкой на блоке в тексте. Несохранённое снимается локально,
-  // сохранённое — запросом на возврат в pending.
+  // Отмена решения: из карточки и кнопкой на блоке в тексте. Несохранённое снимается локально,
+  // сохранённое — запросом на бэкенд.
   const undo = useCallback(
     (id: string) => {
       if (model.decisions[id]) {

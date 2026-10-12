@@ -13,7 +13,7 @@ interface DocumentTextProps {
   segments: Segment[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  /** Быстрая отмена решения с блока в тексте (кнопка «Отмена» при наведении). */
+  /** Быстрая отмена решения кнопкой на самом блоке (появляется при наведении). */
   onUndo?: (id: string) => void;
 }
 
@@ -79,7 +79,7 @@ interface ChangePartProps {
   block: boolean;
   selected: boolean;
   onSelect: (id: string) => void;
-  onUndo?: (id: string) => void;
+  onUndo: ((id: string) => void) | undefined;
 }
 
 // Заголовок нерассмотренной блочной правки по макету: иконка + глагол. Доступное имя — из changeTypeMeta.
@@ -112,38 +112,39 @@ const pendingTone = {
   },
 } as const;
 
-// Принятые (режим «Правки»): изменение и добавление — зелёный блок, удаление — зачёркнуто.
+// Принятые в «Правках»: изменение и добавление — зелёный блок с новым текстом, удаление — зачёркнуто.
 const acceptedTone = {
   modify: { block: 'border-l-4 border-l-emerald-400 bg-emerald-50/60', inline: 'bg-emerald-50' },
   add: { block: 'border-l-4 border-l-emerald-400 bg-emerald-50/60', inline: 'bg-emerald-50' },
   delete: { block: 'bg-red-50/40', inline: '' },
 } as const;
 
-// Отклонённые (режим «Правки»): исходный текст без акцента.
+// Отклонённые в «Правках»: исходный текст без акцента, но блок остаётся кликабельным.
 const rejectedTone = { block: 'border-l-4 border-l-border bg-muted/30', inline: 'bg-muted/40' };
 
-// Рассмотренные в «Чистовике»: как обычный текст, подсветка только при наведении.
+// Рассмотренные в «Чистовике»: обычный текст, подсветка только при наведении — подсказка, что есть отмена.
 const quietTone = { block: 'hover:bg-muted/30', inline: 'hover:bg-muted/40' };
 
 const ChangePart = memo(
   function ChangePart({ segment, mode, block, selected, onSelect, onUndo }: ChangePartProps) {
     const { changeType, status, oldText, newText } = segment;
     const decided = status !== 'pending';
-    // В «Чистовике» рассмотренные правки не подсвечиваются; нерассмотренные размечены как в «Правках».
-    const quiet = mode === 'clean' && decided;
+    const accepted = status === 'accepted';
 
-    // Отклонённое добавление и принятое удаление в «Чистовике» в тексте не показываются;
-    // они доступны из панели «Решено».
+    // Отклонённое добавление в документе не показывается; оно доступно из панели «Решено».
     if (changeType === 'add' && status === 'rejected') return null;
-    if (quiet && changeType === 'delete' && status === 'accepted') return null;
+    // В «Чистовике» принятое удаление уже применено — текста нет.
+    if (mode === 'clean' && accepted && changeType === 'delete') return null;
 
+    // «Чистовик»: нерассмотренные размечены как в «Правках», рассмотренные — без подсветки.
+    const quiet = mode === 'clean' && decided;
     const meta = changeTypeMeta[changeType];
     const label = `${meta.label}${decided ? `, ${decisionLabel[status].toLowerCase()}` : ''}`;
     const toneClass = quiet
       ? quietTone
       : status === 'pending'
         ? pendingTone[changeType]
-        : status === 'accepted'
+        : accepted
           ? acceptedTone[changeType]
           : rejectedTone;
 
@@ -164,14 +165,14 @@ const ChangePart = memo(
         className={cn(
           'group relative cursor-pointer outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring',
           block
-            ? cn('block rounded-lg', quiet ? 'my-0' : 'my-3 px-4 py-3', toneClass.block)
+            ? cn('block rounded-lg', quiet ? 'my-1 -mx-2 px-2' : 'my-3 px-4 py-3', toneClass.block)
             : cn('rounded-sm box-decoration-clone px-1 py-0.5', toneClass.inline),
           selected && 'ring-2 ring-primary ring-offset-1',
         )}
       >
         {status === 'pending' ? (
           <PendingContent changeType={changeType} block={block} oldText={oldText} newText={newText} />
-        ) : status === 'accepted' ? (
+        ) : accepted ? (
           changeType === 'delete' ? (
             <del
               className={cn(
