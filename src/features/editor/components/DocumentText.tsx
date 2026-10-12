@@ -15,6 +15,19 @@ interface DocumentTextProps {
 }
 
 /**
+ * Правка занимает абзац целиком, если слева и справа от неё — перенос строки
+ * (или край документа). Такие правки рисуются блоком с меткой типа; правки внутри
+ * предложения остаются инлайновыми без метки, чтобы не рвать строку.
+ */
+function occupiesParagraph(segments: Segment[], index: number): boolean {
+  const prev = segments[index - 1];
+  const next = segments[index + 1];
+  const startsLine = !prev || (prev.kind === 'text' && /\n\s*$/.test(prev.text));
+  const endsLine = !next || (next.kind === 'text' && /^\s*\n/.test(next.text));
+  return startsLine && endsLine;
+}
+
+/**
  * Текст документа. Сегменты мемоизированы по содержимому: решение по одной правке
  * перестраивает проекцию, но перерисовывается только изменившийся фрагмент.
  */
@@ -40,6 +53,7 @@ export function DocumentText({
                 key={segment.id}
                 segment={segment}
                 mode={mode}
+                block={segment.changeType === 'add' || occupiesParagraph(segments, index)}
                 selected={segment.id === selectedId}
                 onSelect={onSelect}
               />
@@ -56,6 +70,8 @@ const TextPart = memo(function TextPart({ text }: { text: string }) {
 interface ChangePartProps {
   segment: ChangeSegment;
   mode: Exclude<ViewMode, 'original'>;
+  /** Правка занимает абзац целиком: блочная карточка с меткой типа. */
+  block: boolean;
   selected: boolean;
   onSelect: (id: string) => void;
 }
@@ -67,8 +83,11 @@ const toneClass = {
   add: 'border-emerald-400 bg-emerald-50 before:bg-emerald-200 before:text-emerald-900',
 } as const;
 
+const LABEL_CLASS =
+  'before:mb-1 before:block before:w-fit before:rounded before:px-1 before:font-sans before:text-[10px] before:font-semibold before:uppercase before:leading-4 before:tracking-wide before:content-[attr(data-label)]';
+
 const ChangePart = memo(
-  function ChangePart({ segment, mode, selected, onSelect }: ChangePartProps) {
+  function ChangePart({ segment, mode, block, selected, onSelect }: ChangePartProps) {
     const { changeType, status, oldText, newText } = segment;
 
     // В «Чистовике» рассмотренные правки — обычный текст: принятые применены, отклонённые нет.
@@ -91,7 +110,7 @@ const ChangePart = memo(
         aria-pressed={selected}
         data-suggestion-id={segment.id}
         // Метка типа рисуется псевдоэлементом: текст правки и её доступное имя остаются прежними.
-        data-label={meta.label}
+        data-label={block ? meta.label : undefined}
         onClick={() => onSelect(segment.id)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -100,11 +119,11 @@ const ChangePart = memo(
           }
         }}
         className={cn(
-          'cursor-pointer rounded-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring',
-          'before:mr-1.5 before:inline-block before:rounded before:px-1 before:align-middle before:font-sans before:text-[10px] before:font-semibold before:uppercase before:leading-4 before:tracking-wide before:content-[attr(data-label)]',
-          changeType === 'add'
-            ? 'my-2 block rounded-md border-l-4 px-3 py-2 before:mb-1 before:block before:w-fit'
-            : 'box-decoration-clone px-1 py-0.5 ring-1',
+          'cursor-pointer outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring',
+          block
+            ? cn('my-2 block rounded-md px-3 py-2', LABEL_CLASS)
+            : 'box-decoration-clone rounded-sm px-1 py-0.5',
+          changeType === 'add' ? 'border-l-4' : 'ring-1',
           toneClass[changeType],
           selected && 'ring-2 ring-primary ring-offset-1',
           decided && 'opacity-70',
@@ -138,6 +157,7 @@ const ChangePart = memo(
   },
   (prev, next) =>
     prev.mode === next.mode &&
+    prev.block === next.block &&
     prev.selected === next.selected &&
     prev.onSelect === next.onSelect &&
     prev.segment.status === next.segment.status &&

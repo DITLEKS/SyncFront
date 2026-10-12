@@ -2,13 +2,16 @@ import {
   ArrowLeft,
   Check,
   CheckCircle2,
+  FileCheck,
+  FileText,
   Info,
   MoreHorizontal,
   RefreshCw,
   Save,
+  Sparkles,
   TriangleAlert,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -26,6 +29,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { StartAnalysisButton } from '@/features/analysis';
 import { DocumentStatusBadge } from '@/features/documents';
 import { getErrorMessage } from '@/lib/errors';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 
 import { useResetDecisions, useResetReview } from '../hooks/useEditor';
 import { EDITOR_TEXTS } from '../model/texts';
@@ -43,11 +47,14 @@ interface EditorScreenProps {
   refetch: () => Promise<unknown>;
 }
 
-const MODE_OPTIONS: { value: ViewMode; label: string }[] = [
-  { value: 'original', label: 'Оригинал' },
-  { value: 'suggestions', label: 'Правки' },
-  { value: 'clean', label: 'Чистовик' },
+const MODE_OPTIONS: { value: ViewMode; label: string; icon: React.ReactNode }[] = [
+  { value: 'original', label: 'Оригинал', icon: <FileText aria-hidden /> },
+  { value: 'suggestions', label: 'Правки', icon: <Sparkles aria-hidden /> },
+  { value: 'clean', label: 'Чистовик', icon: <FileCheck aria-hidden /> },
 ];
+
+/** Та же точка, что и lg: у сетки редактора — с неё карточка открывается рядом с правкой. */
+const DESKTOP_QUERY = '(min-width: 1024px)';
 
 export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) {
   const model = useEditorModel(projectId, editor, refetch);
@@ -59,6 +66,9 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   const [resetOpen, setResetOpen] = useState(false);
   const resetReview = useResetReview(projectId, meta.id);
   const resetDecisions = useResetDecisions(projectId, meta.id);
+  const desktop = useMediaQuery(DESKTOP_QUERY);
+  const textRef = useRef<HTMLDivElement>(null);
+  const [anchorTop, setAnchorTop] = useState<number | null>(null);
 
   const projection = mode === 'clean' ? model.projections.clean : model.projections.suggestions;
   const selected = model.suggestions.find((s) => s.id === selectedId) ?? null;
@@ -79,6 +89,34 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   useEffect(() => {
     if (selectedId && !selected) setSelectedId(null);
   }, [selectedId, selected]);
+
+  // На десктопе карточка встаёт popover'ом на уровне подсвеченной правки. Если фрагмент
+  // в тексте не найден (или экран узкий) — остаётся в правой панели, как на мобильном.
+  const canAnchor = desktop && selected !== null && mode !== 'original';
+  useLayoutEffect(() => {
+    const wrapper = textRef.current;
+    if (!canAnchor || !selectedId || !wrapper) {
+      setAnchorTop(null);
+      return undefined;
+    }
+    const measure = () => {
+      const target = Array.from(
+        wrapper.querySelectorAll<HTMLElement>('[data-suggestion-id]'),
+      ).find((element) => element.dataset.suggestionId === selectedId);
+      if (!target) {
+        setAnchorTop(null);
+        return;
+      }
+      const top = target.getBoundingClientRect().top - wrapper.getBoundingClientRect().top;
+      setAnchorTop(Math.max(0, Math.round(top)));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, [canAnchor, selectedId, projection]);
+  const popover = canAnchor && anchorTop !== null;
 
   const goBack = () => {
     // key 'default' у первой записи истории: страницу открыли по ссылке, назад некуда.
@@ -108,6 +146,24 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     error: Boolean(model.saveError),
     unsaved: model.unsavedCount,
   });
+
+  const details = selected ? (
+    <SuggestionDetails
+      key={selected.id}
+      suggestion={selected}
+      status={model.statusOf(selected)}
+      unsaved={unsavedIds.has(selected.id)}
+      located={projection.located[selected.id]}
+      canReview={permissions.can_review}
+      undoing={resetDecisions.isPending}
+      onDecide={(decision) => {
+        model.decideSuggestion(selected.id, decision);
+        setSelectedId(null);
+      }}
+      onUndo={() => undo(selected.id)}
+      onClose={() => setSelectedId(null)}
+    />
+  ) : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -209,19 +265,30 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
               <AlertDescription>{EDITOR_TEXTS.originalNotice}</AlertDescription>
             </Alert>
           ) : null}
-          <article className="rounded-lg border bg-card px-6 py-5 shadow-sm sm:px-10 sm:py-8">
-            {model.content.plain_text ? (
-              <DocumentText
-                mode={mode}
-                originalText={model.content.plain_text}
-                segments={projection.segments}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">Документ не содержит текста.</p>
-            )}
-          </article>
+          <div ref={textRef} className="relative">
+            <article className="rounded-lg border bg-card px-6 py-5 shadow-sm sm:px-10 sm:py-8">
+              {model.content.plain_text ? (
+                <DocumentText
+                  mode={mode}
+                  originalText={model.content.plain_text}
+                  segments={projection.segments}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">Документ не содержит текста.</p>
+              )}
+            </article>
+            {popover ? (
+              // Ширина и отступ совпадают с правой колонкой сетки: карточка ложится поверх панели.
+              <div
+                className="absolute left-[calc(100%+1.5rem)] z-[1] w-[22rem] before:absolute before:-left-1.5 before:top-5 before:size-3 before:rotate-45 before:border-b before:border-l before:bg-card"
+                style={{ top: anchorTop }}
+              >
+                {details}
+              </div>
+            ) : null}
+          </div>
         </section>
 
         <div className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
@@ -262,23 +329,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
                     </Alert>
                   )
                 ) : null}
-                {selected ? (
-                  <SuggestionDetails
-                    key={selected.id}
-                    suggestion={selected}
-                    status={model.statusOf(selected)}
-                    unsaved={unsavedIds.has(selected.id)}
-                    located={projection.located[selected.id]}
-                    canReview={permissions.can_review}
-                    undoing={resetDecisions.isPending}
-                    onDecide={(decision) => {
-                      model.decideSuggestion(selected.id, decision);
-                      setSelectedId(null);
-                    }}
-                    onUndo={() => undo(selected.id)}
-                    onClose={() => setSelectedId(null)}
-                  />
-                ) : null}
+                {popover ? null : details}
               </>
             }
           />
