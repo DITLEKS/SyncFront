@@ -92,9 +92,11 @@ describe('Редактор правок', () => {
     expect(within(await documentText()).queryByRole('button')).not.toBeInTheDocument();
     expect(await documentText()).toHaveTextContent('Срок ответа — 10 дней.');
 
-    // В «Чистовике» нерассмотренные правки остаются размеченными.
+    // В «Чистовике» нерассмотренные правки размечены как в «Правках».
     await user.click(screen.getByRole('radio', { name: 'Чистовик' }));
-    expect(within(await documentText()).getAllByRole('button')).toHaveLength(2);
+    const clean = await documentText();
+    expect(within(clean).getByRole('button', { name: 'Изменение' })).toBeInTheDocument();
+    expect(within(clean).getByRole('button', { name: 'Удаление' })).toBeInTheDocument();
   });
 
   it('принимает правку из карточки и сохраняет решение с If-Match', async () => {
@@ -109,15 +111,18 @@ describe('Редактор правок', () => {
     await user.click(within(card).getByRole('button', { name: 'Принять' }));
 
     expect(screen.queryByRole('region', { name: 'Карточка предложения' })).not.toBeInTheDocument();
-    expect(screen.getByText(/Принято:/)).toHaveTextContent(/Принято:\s1/);
-    expect(screen.getByText(/1 из 2/)).toBeInTheDocument();
+    expect(screen.getByText(/^1 принято$/)).toBeInTheDocument();
+    expect(screen.getByText(/1\/2/)).toBeInTheDocument();
     // Принятая правка ушла из «На рассмотрении».
     expect(within(list()).queryByText('14 дней')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('radio', { name: 'Чистовик' }));
     const clean = await documentText();
     expect(clean).toHaveTextContent('Срок ответа — 14 дней.');
-    expect(within(clean).getAllByRole('button')).toHaveLength(1);
+    // Принятая правка — без подсветки, но с быстрой отменой; нерассмотренное удаление размечено.
+    expect(within(clean).getByRole('button', { name: 'Изменение, принято' })).toBeInTheDocument();
+    expect(within(clean).getByRole('button', { name: 'Отменить решение' })).toBeInTheDocument();
+    expect(within(clean).getByRole('button', { name: 'Удаление' })).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: /^Сохранить$/ })[0]!);
     await waitFor(() => expect(reviewRequests()).toHaveLength(1));
@@ -313,7 +318,7 @@ describe('Редактор правок', () => {
     open(project.id, doc.id);
     await documentText();
 
-    expect(screen.getByText(/0 из 201/)).toBeInTheDocument();
+    expect(screen.getByText(/0\/201/)).toBeInTheDocument();
     expect(
       db.requests.some((r) => r.path.includes('/suggestions?') && r.path.includes('offset=200')),
     ).toBe(true);

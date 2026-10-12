@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 import { cn } from '@/lib/cn';
 
@@ -6,6 +6,8 @@ interface SegmentedOption<T extends string> {
   value: T;
   label: string;
   count?: number;
+  /** Иконка перед подписью (декоративная: aria-hidden ставит вызывающий код). */
+  icon?: ReactNode;
 }
 
 interface SegmentedControlProps<T extends string> {
@@ -114,11 +116,12 @@ export function SegmentedControl<T extends string>({
               }
             }}
             className={cn(
-              'relative inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-all duration-200',
+              'relative inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-all duration-200 [&_svg]:size-3.5 [&_svg]:shrink-0',
               active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
               active && !slidingReady && 'bg-card shadow-sm',
             )}
           >
+            {option.icon}
             {option.label}
             {option.count !== undefined ? (
               <span className="text-xs tabular-nums text-muted-foreground">{option.count}</span>
