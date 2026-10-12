@@ -68,7 +68,7 @@ interface FloatingBox {
 
 export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) {
   const model = useEditorModel(projectId, editor, refetch);
-  const { meta, status, permissions, progress } = model;
+  const { meta, status, permissions, progress, decisions, undoBuffered } = model;
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<ViewMode>(() => initialViewMode(meta.view_mode));
@@ -83,7 +83,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
 
   const projection = mode === 'clean' ? model.projections.clean : model.projections.suggestions;
   const selected = model.suggestions.find((s) => s.id === selectedId) ?? null;
-  const unsavedIds = useMemo(() => new Set(Object.keys(model.decisions)), [model.decisions]);
+  const unsavedIds = useMemo(() => new Set(Object.keys(decisions)), [decisions]);
 
   const selectFromPanel = useCallback((id: string) => {
     setSelectedId(id);
@@ -100,13 +100,13 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   // сохранённое — запросом на бэкенд.
   const undo = useCallback(
     (id: string) => {
-      if (model.decisions[id]) {
-        model.undoBuffered(id);
+      if (decisions[id]) {
+        undoBuffered(id);
         return;
       }
       resetDecisions.mutate([id], { onError: (error) => toast.error(getErrorMessage(error)) });
     },
-    [model.decisions, model.undoBuffered, resetDecisions],
+    [decisions, undoBuffered, resetDecisions],
   );
 
   // Выбранная правка исчезла (новый анализ): закрываем карточку.
