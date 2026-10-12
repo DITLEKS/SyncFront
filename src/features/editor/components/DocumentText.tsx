@@ -165,13 +165,18 @@ const ChangePart = memo(
         className={cn(
           'group relative cursor-pointer outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring',
           block
-            ? cn('block rounded-lg', quiet ? 'my-1 -mx-2 px-2' : 'my-3 px-4 py-3', toneClass.block)
+            ? cn('block rounded-lg', quiet ? '-mx-2 my-1 px-2' : 'my-3 px-4 py-3', toneClass.block)
             : cn('rounded-sm box-decoration-clone px-1 py-0.5', toneClass.inline),
           selected && 'ring-2 ring-primary ring-offset-1',
         )}
       >
         {status === 'pending' ? (
-          <PendingContent changeType={changeType} block={block} oldText={oldText} newText={newText} />
+          <PendingContent
+            changeType={changeType}
+            block={block}
+            oldText={oldText}
+            newText={newText}
+          />
         ) : accepted ? (
           changeType === 'delete' ? (
             <del
@@ -200,7 +205,7 @@ const ChangePart = memo(
             }}
             onKeyDown={(event) => event.stopPropagation()}
             className={cn(
-              'inline-flex items-center gap-1 rounded-md border bg-card font-sans text-xs text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100',
+              'inline-flex items-center gap-1 rounded-md border bg-card font-sans text-xs text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100',
               block ? 'absolute right-2 top-2 px-2 py-0.5' : 'ml-1 px-1 align-middle',
             )}
           >
