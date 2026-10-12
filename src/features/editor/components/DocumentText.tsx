@@ -122,7 +122,7 @@ const ChangePart = memo(
           'cursor-pointer outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring',
           block
             ? cn('my-2 block rounded-md px-3 py-2', LABEL_CLASS)
-            : 'box-decoration-clone rounded-sm px-1 py-0.5',
+            : 'rounded-sm box-decoration-clone px-1 py-0.5',
           changeType === 'add' ? 'border-l-4' : 'ring-1',
           toneClass[changeType],
           selected && 'ring-2 ring-primary ring-offset-1',

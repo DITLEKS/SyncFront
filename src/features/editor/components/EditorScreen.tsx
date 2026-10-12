@@ -100,9 +100,9 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
       return undefined;
     }
     const measure = () => {
-      const target = Array.from(
-        wrapper.querySelectorAll<HTMLElement>('[data-suggestion-id]'),
-      ).find((element) => element.dataset.suggestionId === selectedId);
+      const target = Array.from(wrapper.querySelectorAll<HTMLElement>('[data-suggestion-id]')).find(
+        (element) => element.dataset.suggestionId === selectedId,
+      );
       if (!target) {
         setAnchorTop(null);
         return;
