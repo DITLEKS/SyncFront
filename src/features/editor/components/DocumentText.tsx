@@ -60,6 +60,13 @@ interface ChangePartProps {
   onSelect: (id: string) => void;
 }
 
+// Цвета карточки правки в тексте и её метки (псевдоэлемент before).
+const toneClass = {
+  modify: 'bg-amber-50 ring-amber-300 before:bg-amber-200 before:text-amber-900',
+  delete: 'bg-red-50 ring-red-200 before:bg-red-200 before:text-red-900',
+  add: 'border-emerald-400 bg-emerald-50 before:bg-emerald-200 before:text-emerald-900',
+} as const;
+
 const ChangePart = memo(
   function ChangePart({ segment, mode, selected, onSelect }: ChangePartProps) {
     const { changeType, status, oldText, newText } = segment;
@@ -83,6 +90,8 @@ const ChangePart = memo(
         aria-label={label}
         aria-pressed={selected}
         data-suggestion-id={segment.id}
+        // Метка типа рисуется псевдоэлементом: текст правки и её доступное имя остаются прежними.
+        data-label={meta.label}
         onClick={() => onSelect(segment.id)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -92,7 +101,11 @@ const ChangePart = memo(
         }}
         className={cn(
           'cursor-pointer rounded-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring',
-          changeType === 'add' && 'block',
+          'before:mr-1.5 before:inline-block before:rounded before:px-1 before:align-middle before:font-sans before:text-[10px] before:font-semibold before:uppercase before:leading-4 before:tracking-wide before:content-[attr(data-label)]',
+          changeType === 'add'
+            ? 'my-2 block rounded-md border-l-4 px-3 py-2 before:mb-1 before:block before:w-fit'
+            : 'box-decoration-clone px-1 py-0.5 ring-1',
+          toneClass[changeType],
           selected && 'ring-2 ring-primary ring-offset-1',
           decided && 'opacity-70',
         )}
@@ -101,7 +114,7 @@ const ChangePart = memo(
           <del
             className={cn(
               'decoration-2',
-              changeType === 'delete' ? 'bg-red-100 decoration-red-600' : 'decoration-red-500',
+              changeType === 'delete' ? 'decoration-red-600' : 'decoration-red-500',
               status === 'rejected' ? 'no-underline' : 'line-through',
               changeType === 'modify' && 'text-muted-foreground',
             )}
@@ -113,7 +126,7 @@ const ChangePart = memo(
           <ins
             className={cn(
               'no-underline',
-              changeType === 'add' ? 'bg-emerald-100' : 'bg-amber-100',
+              changeType === 'modify' && 'ml-1 font-medium text-foreground',
               status === 'rejected' && 'line-through decoration-muted-foreground',
             )}
           >

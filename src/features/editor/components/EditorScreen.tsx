@@ -117,15 +117,18 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
             <ArrowLeft aria-hidden />
           </Button>
           <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold tracking-tight">{meta.title}</h1>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+              <h1 className="truncate text-lg font-semibold tracking-tight">{meta.title}</h1>
               <DocumentStatusBadge status={status} />
-              <span>
-                На рассмотрении:{' '}
-                <span className="tabular-nums text-foreground">{progress.pending}</span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 tabular-nums">
+                <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
+                {progress.pending} на рассмотрении
               </span>
-              <span>
-                Принято: <span className="tabular-nums text-foreground">{progress.accepted}</span>
+              <span className="inline-flex items-center gap-1.5 tabular-nums">
+                <span aria-hidden className="size-1.5 rounded-full bg-emerald-500" />
+                {progress.accepted} принято
               </span>
             </div>
           </div>

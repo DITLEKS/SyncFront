@@ -1,5 +1,5 @@
 import { observeElementRect, useVirtualizer } from '@tanstack/react-virtual';
-import { CheckCircle2, Inbox, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, FileText, Inbox, ListChecks, TriangleAlert } from 'lucide-react';
 import { memo, useEffect, useRef, useState } from 'react';
 
 import type { SuggestionResponse } from '@/api/types';
@@ -19,7 +19,7 @@ import {
 } from '../model/suggestionList';
 import { EMPTY_FILTER_TEXTS, ISSUE_TEXTS } from '../model/texts';
 
-import { ChangeTypeBadge } from './ChangeTypeBadge';
+import { ChangeTypeLabel } from './ChangeTypeLabel';
 
 export type SuggestionFilter = 'pending' | 'decided' | 'all';
 
@@ -72,15 +72,17 @@ export function SuggestionsPanel({
   return (
     <aside aria-labelledby="suggestions-title" className="flex min-h-0 flex-col gap-3">
       <div className="space-y-2">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 id="suggestions-title" className="text-base font-semibold">
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="suggestions-title" className="flex items-center gap-2 text-base font-semibold">
+            <ListChecks className="size-4 text-primary" aria-hidden />
             Предложения ИИ
           </h2>
           <span className="text-sm tabular-nums text-muted-foreground">
-            {progress.decided} из {progress.total} · {progress.percent}%
+            {progress.decided}/{progress.total}
           </span>
         </div>
         <Progress value={progress.percent / 100} label="Прогресс проверки" />
+        <p className="text-xs text-muted-foreground">Ревью завершено на {progress.percent}%</p>
       </div>
 
       {header}
@@ -195,7 +197,7 @@ const SuggestionCard = memo(function SuggestionCard({
       )}
     >
       <span className="flex items-center gap-2">
-        <ChangeTypeBadge type={s.change_type} />
+        <ChangeTypeLabel type={s.change_type} />
         {status !== 'pending' ? (
           <span
             className={cn(
@@ -215,10 +217,11 @@ const SuggestionCard = memo(function SuggestionCard({
           />
         ) : null}
       </span>
-      <span className="line-clamp-2 block break-words">{shortText(s)}</span>
+      <span className="line-clamp-2 block break-words text-foreground">{shortText(s)}</span>
       {s.section_ref ? (
-        <span className="block truncate text-xs text-muted-foreground">
-          Раздел: {s.section_ref}
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <FileText className="size-3 shrink-0" aria-hidden />
+          <span className="truncate">{s.section_ref}</span>
         </span>
       ) : null}
     </button>

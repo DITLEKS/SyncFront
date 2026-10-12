@@ -109,8 +109,8 @@ describe('Редактор правок', () => {
     await user.click(within(card).getByRole('button', { name: 'Принять' }));
 
     expect(screen.queryByRole('region', { name: 'Карточка предложения' })).not.toBeInTheDocument();
-    expect(screen.getByText(/Принято:/)).toHaveTextContent(/Принято:\s1/);
-    expect(screen.getByText(/1 из 2/)).toBeInTheDocument();
+    expect(screen.getByText(/^1 принято$/)).toBeInTheDocument();
+    expect(screen.getByText(/1\/2/)).toBeInTheDocument();
     // Принятая правка ушла из «На рассмотрении».
     expect(within(list()).queryByText('14 дней')).not.toBeInTheDocument();
 
@@ -313,7 +313,7 @@ describe('Редактор правок', () => {
     open(project.id, doc.id);
     await documentText();
 
-    expect(screen.getByText(/0 из 201/)).toBeInTheDocument();
+    expect(screen.getByText(/0\/201/)).toBeInTheDocument();
     expect(
       db.requests.some((r) => r.path.includes('/suggestions?') && r.path.includes('offset=200')),
     ).toBe(true);
