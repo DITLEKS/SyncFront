@@ -8,8 +8,6 @@ import { decisionLabel, type Decision, type SuggestionStatus } from '@/domain/ed
 
 import { EDITOR_TEXTS, ISSUE_TEXTS } from '../model/texts';
 
-import { ChangeTypeLabel } from './ChangeTypeLabel';
-
 interface SuggestionDetailsProps {
   suggestion: SuggestionResponse;
   status: SuggestionStatus;
@@ -59,7 +57,7 @@ export function SuggestionDetails({
   return (
     <section
       aria-label="Карточка предложения"
-      className="animate-fade-in overflow-hidden rounded-xl border bg-card shadow-md"
+      className="animate-fade-in overflow-hidden rounded-xl border bg-card shadow-xl"
     >
       <header className="flex items-center justify-between gap-2 border-b bg-muted/40 px-4 py-2.5">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold">
@@ -67,7 +65,6 @@ export function SuggestionDetails({
             <MessageSquare className="size-4 text-primary" aria-hidden />
             Предложение ИИ
           </span>
-          <ChangeTypeLabel type={type} />
           {status !== 'pending' ? (
             <span className="text-xs font-medium text-muted-foreground">
               {decisionLabel[status]}

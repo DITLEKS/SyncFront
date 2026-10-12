@@ -1,7 +1,8 @@
-import { memo, type ReactNode } from 'react';
+import { Pencil, Plus, X } from 'lucide-react';
+import { memo } from 'react';
 
 import type { ChangeSegment, Segment } from '@/domain/editor/projection';
-import { changeTypeMeta, decisionLabel } from '@/domain/editor/suggestion';
+import { changeTypeMeta, decisionLabel, type ChangeType } from '@/domain/editor/suggestion';
 import { cn } from '@/lib/cn';
 
 import type { ViewMode } from '../model/useEditorModel';
@@ -12,14 +13,12 @@ interface DocumentTextProps {
   segments: Segment[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  /** Карточка выбранной правки; раскрывается в тексте сразу под абзацем с правкой. */
-  details?: ReactNode;
 }
 
 /**
  * Правка занимает абзац целиком, если слева и справа от неё — перенос строки
- * (или край документа). Такие правки рисуются блоком с меткой типа; правки внутри
- * предложения остаются инлайновыми без метки, чтобы не рвать строку.
+ * (или край документа). Такие правки рисуются блоком по макету; правки внутри
+ * предложения остаются инлайновыми, чтобы не рвать строку.
  */
 function occupiesParagraph(segments: Segment[], index: number): boolean {
   const prev = segments[index - 1];
@@ -39,7 +38,6 @@ export function DocumentText({
   segments,
   selectedId,
   onSelect,
-  details,
 }: DocumentTextProps) {
   return (
     <div
@@ -48,64 +46,22 @@ export function DocumentText({
     >
       {mode === 'original'
         ? originalText
-        : renderSegments(mode, segments, selectedId, onSelect, details)}
+        : segments.map((segment, index) =>
+            segment.kind === 'text' ? (
+              <TextPart key={`t${index}`} text={segment.text} />
+            ) : (
+              <ChangePart
+                key={segment.id}
+                segment={segment}
+                mode={mode}
+                block={segment.changeType === 'add' || occupiesParagraph(segments, index)}
+                selected={segment.id === selectedId}
+                onSelect={onSelect}
+              />
+            ),
+          )}
     </div>
   );
-}
-
-/**
- * Карточка правки встраивается в поток текста: после блочной правки — сразу, после
- * инлайновой — в конце её абзаца, чтобы не разрывать предложение.
- */
-function renderSegments(
-  mode: Exclude<ViewMode, 'original'>,
-  segments: Segment[],
-  selectedId: string | null,
-  onSelect: (id: string) => void,
-  details: ReactNode,
-): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  const card = details ? (
-    <div key="details" className="my-3 font-sans leading-normal whitespace-normal">
-      {details}
-    </div>
-  ) : null;
-  let awaitingParagraphEnd = false;
-
-  segments.forEach((segment, index) => {
-    if (segment.kind === 'text') {
-      const cut = awaitingParagraphEnd ? segment.text.indexOf('\n') : -1;
-      if (cut === -1) {
-        nodes.push(<TextPart key={`t${index}`} text={segment.text} />);
-        return;
-      }
-      // Перенос строки заменяет карточка: она блочная и сама отделяет абзацы.
-      nodes.push(<TextPart key={`t${index}a`} text={segment.text.slice(0, cut)} />);
-      nodes.push(card);
-      nodes.push(<TextPart key={`t${index}b`} text={segment.text.slice(cut + 1)} />);
-      awaitingParagraphEnd = false;
-      return;
-    }
-
-    const block = segment.changeType === 'add' || occupiesParagraph(segments, index);
-    nodes.push(
-      <ChangePart
-        key={segment.id}
-        segment={segment}
-        mode={mode}
-        block={block}
-        selected={segment.id === selectedId}
-        onSelect={onSelect}
-      />,
-    );
-    if (card && segment.id === selectedId) {
-      if (block) nodes.push(card);
-      else awaitingParagraphEnd = true;
-    }
-  });
-
-  if (awaitingParagraphEnd) nodes.push(card);
-  return nodes;
 }
 
 const TextPart = memo(function TextPart({ text }: { text: string }) {
@@ -115,21 +71,40 @@ const TextPart = memo(function TextPart({ text }: { text: string }) {
 interface ChangePartProps {
   segment: ChangeSegment;
   mode: Exclude<ViewMode, 'original'>;
-  /** Правка занимает абзац целиком: блочная карточка с меткой типа. */
+  /** Правка занимает абзац целиком: блочная карточка с заголовком по макету. */
   block: boolean;
   selected: boolean;
   onSelect: (id: string) => void;
 }
 
-// Цвета карточки правки в тексте и её метки (псевдоэлемент before).
-const toneClass = {
-  modify: 'bg-amber-50 ring-amber-300 before:bg-amber-200 before:text-amber-900',
-  delete: 'bg-red-50 ring-red-200 before:bg-red-200 before:text-red-900',
-  add: 'border-emerald-400 bg-emerald-50 before:bg-emerald-200 before:text-emerald-900',
-} as const;
+// Заголовок блочной правки по макету: иконка + глагол. Доступное имя берётся из changeTypeMeta.
+const BLOCK_HEADER: Record<ChangeType, { verb: string; Icon: typeof Pencil }> = {
+  modify: { verb: 'Изменить', Icon: Pencil },
+  add: { verb: 'Добавить', Icon: Plus },
+  delete: { verb: 'Удалить', Icon: X },
+};
 
-const LABEL_CLASS =
-  'before:mb-1 before:block before:w-fit before:rounded before:px-1 before:font-sans before:text-[10px] before:font-semibold before:uppercase before:leading-4 before:tracking-wide before:content-[attr(data-label)]';
+// Цвета по типу: рамка и левая полоса блока, инлайновая подсветка, заголовок, зачёркнутый старый текст.
+const tone = {
+  modify: {
+    block: 'border-amber-300 border-l-amber-400 bg-amber-50/50',
+    inline: 'bg-amber-50 ring-amber-300',
+    header: 'text-amber-800',
+    old: 'text-amber-700/80 decoration-amber-600',
+  },
+  delete: {
+    block: 'border-red-200 border-l-red-400 bg-red-50/50',
+    inline: 'bg-red-50 ring-red-200',
+    header: 'text-red-700',
+    old: 'text-red-700/80 decoration-red-600',
+  },
+  add: {
+    block: 'border-emerald-200 border-l-emerald-400 bg-emerald-50/50',
+    inline: 'bg-emerald-50 ring-emerald-200',
+    header: 'text-emerald-700',
+    old: '',
+  },
+} as const;
 
 const ChangePart = memo(
   function ChangePart({ segment, mode, block, selected, onSelect }: ChangePartProps) {
@@ -145,7 +120,10 @@ const ChangePart = memo(
 
     const meta = changeTypeMeta[changeType];
     const decided = status !== 'pending';
+    const rejected = status === 'rejected';
     const label = `${meta.label}${decided ? `, ${decisionLabel[status].toLowerCase()}` : ''}`;
+    const { Icon, verb } = BLOCK_HEADER[changeType];
+    const colors = tone[changeType];
 
     return (
       <span
@@ -154,8 +132,6 @@ const ChangePart = memo(
         aria-label={label}
         aria-pressed={selected}
         data-suggestion-id={segment.id}
-        // Метка типа рисуется псевдоэлементом: текст правки и её доступное имя остаются прежними.
-        data-label={block ? meta.label : undefined}
         onClick={() => onSelect(segment.id)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -166,21 +142,32 @@ const ChangePart = memo(
         className={cn(
           'cursor-pointer outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring',
           block
-            ? cn('my-2 block rounded-md px-3 py-2', LABEL_CLASS)
-            : 'rounded-sm box-decoration-clone px-1 py-0.5',
-          changeType === 'add' ? 'border-l-4' : 'ring-1',
-          toneClass[changeType],
+            ? cn('my-3 block rounded-lg border border-l-4 px-4 py-3', colors.block)
+            : cn('rounded-sm box-decoration-clone px-1 py-0.5 ring-1', colors.inline),
           selected && 'ring-2 ring-primary ring-offset-1',
           decided && 'opacity-70',
         )}
       >
+        {block ? (
+          // Заголовок декоративный: тип уже есть в aria-label кнопки.
+          <span
+            aria-hidden
+            className={cn(
+              'mb-1.5 flex items-center gap-1.5 font-sans text-[11px] font-bold uppercase tracking-wide',
+              colors.header,
+            )}
+          >
+            <Icon className="size-3.5" />
+            {verb}
+          </span>
+        ) : null}
         {changeType !== 'add' ? (
           <del
             className={cn(
               'decoration-2',
-              changeType === 'delete' ? 'decoration-red-600' : 'decoration-red-500',
-              status === 'rejected' ? 'no-underline' : 'line-through',
-              changeType === 'modify' && 'text-muted-foreground',
+              block && 'block',
+              rejected ? 'text-foreground no-underline' : cn('line-through', colors.old),
+              !block && changeType === 'modify' && !rejected && 'text-muted-foreground',
             )}
           >
             {oldText}
@@ -190,8 +177,10 @@ const ChangePart = memo(
           <ins
             className={cn(
               'no-underline',
-              changeType === 'modify' && 'ml-1 font-medium text-foreground',
-              status === 'rejected' && 'line-through decoration-muted-foreground',
+              block && 'block',
+              block && changeType === 'modify' && 'mt-1 font-semibold text-foreground',
+              !block && changeType === 'modify' && 'ml-1 font-medium text-foreground',
+              rejected && 'line-through decoration-muted-foreground',
             )}
           >
             {newText}

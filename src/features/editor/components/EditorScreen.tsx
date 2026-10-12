@@ -11,7 +11,7 @@ import {
   Sparkles,
   TriangleAlert,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -53,8 +53,16 @@ const MODE_OPTIONS: { value: ViewMode; label: string; icon: React.ReactNode }[] 
   { value: 'clean', label: 'Чистовик', icon: <FileCheck aria-hidden /> },
 ];
 
-/** Та же точка, что и lg: у сетки редактора — с неё карточка раскрывается в тексте под правкой. */
+/** Та же точка, что и lg: у сетки редактора — с неё карточка «парит» над текстом под правкой. */
 const DESKTOP_QUERY = '(min-width: 1024px)';
+/** Ширина парящей карточки по макету (34rem); на узкой статье ужимается до её правого края. */
+const CARD_WIDTH = 544;
+
+interface FloatingBox {
+  top: number;
+  left: number;
+  width: number;
+}
 
 export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) {
   const model = useEditorModel(projectId, editor, refetch);
@@ -67,6 +75,8 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   const resetReview = useResetReview(projectId, meta.id);
   const resetDecisions = useResetDecisions(projectId, meta.id);
   const desktop = useMediaQuery(DESKTOP_QUERY);
+  const textRef = useRef<HTMLDivElement>(null);
+  const [floating, setFloating] = useState<FloatingBox | null>(null);
 
   const projection = mode === 'clean' ? model.projections.clean : model.projections.suggestions;
   const selected = model.suggestions.find((s) => s.id === selectedId) ?? null;
@@ -88,12 +98,39 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     if (selectedId && !selected) setSelectedId(null);
   }, [selectedId, selected]);
 
-  // На десктопе карточка раскрывается в тексте под правкой (как в макете). На узком экране,
-  // в «Оригинале» и если фрагмент в тексте не найден — остаётся в правой панели.
-  const inText = projection.segments.some(
-    (segment) => segment.kind !== 'text' && segment.id === selectedId,
-  );
-  const inline = desktop && selected !== null && mode !== 'original' && inText;
+  // На десктопе карточка «парит» над текстом сразу под выбранным блоком, не сдвигая ни текст,
+  // ни панель. На узком экране, в «Оригинале» и если фрагмент не найден — остаётся в правой панели.
+  const canFloat = desktop && selected !== null && mode !== 'original';
+  useLayoutEffect(() => {
+    const wrapper = textRef.current;
+    if (!canFloat || !selectedId || !wrapper) {
+      setFloating(null);
+      return undefined;
+    }
+    const measure = () => {
+      const target = Array.from(wrapper.querySelectorAll<HTMLElement>('[data-suggestion-id]')).find(
+        (element) => element.dataset.suggestionId === selectedId,
+      );
+      if (!target) {
+        setFloating(null);
+        return;
+      }
+      const rect = target.getBoundingClientRect();
+      const base = wrapper.getBoundingClientRect();
+      const left = Math.max(0, rect.left - base.left);
+      setFloating({
+        top: Math.round(rect.bottom - base.top + 8),
+        left: Math.round(left),
+        width: Math.round(Math.min(CARD_WIDTH, base.width - left)),
+      });
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, [canFloat, selectedId, projection]);
+  const popover = canFloat && floating !== null;
 
   const goBack = () => {
     // key 'default' у первой записи истории: страницу открыли по ссылке, назад некуда.
@@ -242,20 +279,30 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
               <AlertDescription>{EDITOR_TEXTS.originalNotice}</AlertDescription>
             </Alert>
           ) : null}
-          <article className="rounded-lg border bg-card px-6 py-5 shadow-sm sm:px-10 sm:py-8">
-            {model.content.plain_text ? (
-              <DocumentText
-                mode={mode}
-                originalText={model.content.plain_text}
-                segments={projection.segments}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                details={inline ? details : undefined}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">Документ не содержит текста.</p>
-            )}
-          </article>
+          <div ref={textRef} className="relative">
+            <article className="rounded-lg border bg-card px-6 py-5 shadow-sm sm:px-10 sm:py-8">
+              {model.content.plain_text ? (
+                <DocumentText
+                  mode={mode}
+                  originalText={model.content.plain_text}
+                  segments={projection.segments}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">Документ не содержит текста.</p>
+              )}
+            </article>
+            {popover ? (
+              // z-[5] — ниже sticky-шапки (z-10): при прокрутке карточка уходит под неё.
+              <div
+                className="absolute z-[5]"
+                style={{ top: floating.top, left: floating.left, width: floating.width }}
+              >
+                {details}
+              </div>
+            ) : null}
+          </div>
         </section>
 
         <div className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
@@ -296,7 +343,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
                     </Alert>
                   )
                 ) : null}
-                {inline ? null : details}
+                {popover ? null : details}
               </>
             }
           />
