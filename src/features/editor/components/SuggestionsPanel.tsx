@@ -79,8 +79,9 @@ export function SuggestionsPanel({
   );
 
   return (
-    <aside aria-labelledby="suggestions-title" className="flex min-h-0 flex-col gap-3">
-      <div className="space-y-2">
+    <aside aria-labelledby="suggestions-title" className="flex min-h-0 flex-col gap-5">
+      {/* Шапка панели отделена линией от фильтра и списка — как на макете. */}
+      <div className="space-y-2 border-b pb-5">
         <div className="flex items-center justify-between gap-2">
           <h2 id="suggestions-title" className="flex items-center gap-2 text-base font-semibold">
             <ListChecks className="size-4 text-primary" aria-hidden />
@@ -114,7 +115,7 @@ export function SuggestionsPanel({
       ) : isVirtualized(filtered.length) ? (
         <VirtualSuggestionList items={filtered} selectedId={selectedId} renderCard={renderCard} />
       ) : (
-        <ul className="space-y-1" aria-label="Список предложений">
+        <ul className="space-y-3" aria-label="Список предложений">
           {filtered.map((s) => (
             <li key={s.id}>{renderCard(s)}</li>
           ))}
@@ -168,7 +169,7 @@ function VirtualSuggestionList({ items, selectedId, renderCard }: VirtualSuggest
               key={row.key}
               ref={virtualizer.measureElement}
               data-index={row.index}
-              className="absolute left-0 top-0 w-full pb-1"
+              className="absolute left-0 top-0 w-full pb-3"
               style={{ transform: `translateY(${row.start}px)` }}
             >
               {renderCard(suggestion)}
@@ -222,23 +223,28 @@ const SuggestionCard = memo(function SuggestionCard({
       >
         <span className="flex items-center gap-2">
           <ChangeTypeLabel type={s.change_type} />
+          {issue ? (
+            <TriangleAlert
+              className="size-4 shrink-0 text-amber-600"
+              aria-label={ISSUE_TEXTS[issue]}
+            />
+          ) : null}
+          {/* Статус решения — у правого края строки, как на макете («✕ Отклонено»). */}
           {status !== 'pending' ? (
             <span
               className={cn(
-                'inline-flex items-center gap-1 text-xs font-medium',
+                'ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-medium',
                 status === 'accepted' ? 'text-emerald-700' : 'text-muted-foreground',
               )}
             >
-              {status === 'accepted' ? <CheckCircle2 className="size-3" aria-hidden /> : null}
+              {status === 'accepted' ? (
+                <CheckCircle2 className="size-3" aria-hidden />
+              ) : (
+                <X className="size-3" aria-hidden />
+              )}
               {decisionLabel[status]}
               {unsaved ? ' · не сохранено' : ''}
             </span>
-          ) : null}
-          {issue ? (
-            <TriangleAlert
-              className="ml-auto size-4 shrink-0 text-amber-600"
-              aria-label={ISSUE_TEXTS[issue]}
-            />
           ) : null}
         </span>
         <span className="line-clamp-2 block break-words text-foreground">{shortText(s)}</span>

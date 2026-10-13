@@ -112,6 +112,8 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     writePanelOpen(panelOpen);
   }, [panelOpen]);
 
+  const togglePanel = useCallback(() => setPanelOpen((open) => !open), []);
+
   // Word-документ рисуется из самого файла во всех режимах: в «Оригинале» как есть,
   // в «Правках» и «Чистовике» — с правками поверх рендера docx-preview.
   const isDocx = meta.format === 'docx';
@@ -317,6 +319,8 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     />
   );
 
+  const panelToggleLabel = panelOpen ? 'Скрыть предложения ИИ' : 'Показать предложения ИИ';
+
   return (
     <div className="flex flex-col gap-4">
       {/* Шапка по макету: название держит минимальную ширину, группа действий при нехватке места
@@ -395,8 +399,8 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
             size={tablet ? 'icon' : 'iconSm'}
             variant="outline"
             className={cn('relative', panelOpen && 'bg-accent text-accent-foreground')}
-            onClick={() => setPanelOpen((open) => !open)}
-            aria-label={panelOpen ? 'Скрыть предложения ИИ' : 'Показать предложения ИИ'}
+            onClick={togglePanel}
+            aria-label={panelToggleLabel}
             aria-expanded={panelOpen}
             aria-controls="suggestions-panel"
           >
@@ -440,7 +444,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
       ) : null}
 
       {/* flex вместо grid: при свёрнутой панели текст занимает всю ширину, а панель уезжает вправо. */}
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
         <section aria-label="Текст документа" className="min-w-0 flex-1 space-y-3">
           {mode === 'original' ? (
             <Alert>
@@ -466,20 +470,32 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
           </div>
         </section>
 
-        {/* Выдвижная панель: на lg+ анимируется ширина и прозрачность (как у Sidebar), visibility убирает
-            скрытую панель из порядка табуляции; на узких экранах блок просто скрывается. */}
+        {/* Выдвижная «шторка» по макету: на lg+ прижата к правому краю окна и к низу шапки
+            (отрицательные отступы гасят поля страницы), с левой границей и собственным скроллом.
+            Анимируются ширина и прозрачность (как у Sidebar); visibility убирает скрытую панель
+            из порядка табуляции. На узких экранах — обычный блок под текстом, который просто скрывается. */}
         <div
           id="suggestions-panel"
           aria-hidden={!panelOpen}
           className={cn(
-            'shrink-0 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto',
+            'relative shrink-0 lg:sticky lg:top-24 lg:-mr-8 lg:-mt-4 lg:h-[calc(100vh-6rem)] lg:self-start',
             'transition-[width,opacity,transform,visibility] duration-300 ease-in-out motion-reduce:transition-none',
             panelOpen
-              ? 'visible translate-x-0 opacity-100 lg:w-[19rem] lg:pr-1 xl:w-[22rem]'
+              ? 'visible translate-x-0 opacity-100 lg:w-[20rem] lg:border-l lg:bg-card xl:w-[23rem]'
               : 'hidden lg:invisible lg:block lg:w-0 lg:translate-x-6 lg:overflow-hidden lg:opacity-0',
           )}
         >
-          <div className="lg:w-[calc(19rem-0.25rem)] xl:w-[calc(22rem-0.25rem)]">
+          {/* Хэндл на левой кромке — второй способ свернуть панель, как на макете. */}
+          <button
+            type="button"
+            onClick={togglePanel}
+            aria-label={panelToggleLabel}
+            aria-expanded={panelOpen}
+            aria-controls="suggestions-panel"
+            tabIndex={panelOpen ? 0 : -1}
+            className="absolute left-1 top-4 z-10 hidden h-64 w-1.5 rounded-full bg-border transition-colors hover:bg-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:block"
+          />
+          <div className="lg:h-full lg:w-[20rem] lg:overflow-y-auto lg:px-7 lg:py-6 xl:w-[23rem]">
             <SuggestionsPanel
               suggestions={model.suggestions}
               statusOf={model.statusOf}
