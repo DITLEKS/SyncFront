@@ -58,6 +58,20 @@ export async function getDocument(
   );
 }
 
+/**
+ * Исходный файл документа как есть — для рендера режима «Оригинал» в браузере.
+ * Идёт через API под Bearer, а не по presigned-ссылке /download: та в dev указывает
+ * на внутренний хост хранилища (SyncBack#72).
+ */
+export async function getDocumentFile(projectId: string, documentId: string): Promise<Blob> {
+  return ok<Blob>(
+    await client.GET('/api/v1/projects/{project_id}/documents/{document_id}/file', {
+      params: { path: { project_id: projectId, document_id: documentId } },
+      parseAs: 'blob',
+    }),
+  );
+}
+
 /** 409, если документ в in_progress. */
 export async function deleteDocument(projectId: string, documentId: string): Promise<void> {
   ok(
