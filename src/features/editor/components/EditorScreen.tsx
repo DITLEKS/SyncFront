@@ -253,7 +253,6 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     return outcome;
   };
 
-  const allProcessed = progress.total > 0 && progress.pending === 0;
   const completed = status === 'ready' && model.unsavedCount === 0;
   const liveStatus = liveStatusText({
     saving: model.saving,
@@ -535,36 +534,14 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
               onUndo={undo}
               header={
                 <>
-                  {allProcessed ? (
-                    completed ? (
-                      <Alert variant="success">
-                        <CheckCircle2 aria-hidden />
-                        <AlertDescription className="space-y-2">
-                          <p>{EDITOR_TEXTS.completed}</p>
-                          {reanalyze ? <span className="flex">{reanalyze}</span> : null}
-                        </AlertDescription>
-                      </Alert>
-                    ) : (
-                      <Alert>
-                        <CheckCircle2 aria-hidden />
-                        <AlertDescription className="space-y-2">
-                          <p>{EDITOR_TEXTS.allProcessed}</p>
-                          <span className="flex flex-wrap gap-2">
-                            <SaveButton
-                              canSave={model.canSave}
-                              saving={model.saving}
-                              onSave={() => void save()}
-                            />
-                            {mode !== 'clean' ? (
-                              <Button size="sm" variant="outline" onClick={() => setMode('clean')}>
-                                Просмотреть чистовик
-                              </Button>
-                            ) : null}
-                            {reanalyze}
-                          </span>
-                        </AlertDescription>
-                      </Alert>
-                    )
+                  {completed ? (
+                    <Alert variant="success">
+                      <CheckCircle2 aria-hidden />
+                      <AlertDescription className="space-y-2">
+                        <p>{EDITOR_TEXTS.completed}</p>
+                        {reanalyze ? <span className="flex">{reanalyze}</span> : null}
+                      </AlertDescription>
+                    </Alert>
                   ) : (
                     reanalyze
                   )}
