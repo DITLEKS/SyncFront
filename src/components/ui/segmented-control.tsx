@@ -27,10 +27,11 @@ interface SegmentedControlProps<T extends string> {
 /** Небольшой перелёт в конце — «пружина» без библиотеки анимаций. */
 const SPRING_EASING = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
 
-const SIZE_CLASS: Record<SegmentedSize, { container: string; button: string; indicator: string }> = {
-  sm: { container: 'rounded-lg p-1', button: 'h-7 px-3 text-sm', indicator: 'top-1 h-7' },
-  md: { container: 'rounded-xl p-1', button: 'h-9 px-4 text-[15px]', indicator: 'top-1 h-9' },
-};
+const SIZE_CLASS: Record<SegmentedSize, { container: string; button: string; indicator: string }> =
+  {
+    sm: { container: 'rounded-lg p-1', button: 'h-7 px-3 text-sm', indicator: 'top-1 h-7' },
+    md: { container: 'rounded-xl p-1', button: 'h-9 px-4 text-[15px]', indicator: 'top-1 h-9' },
+  };
 
 interface IndicatorBox {
   left: number;
