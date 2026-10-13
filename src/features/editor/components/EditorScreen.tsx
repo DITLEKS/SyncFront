@@ -2,13 +2,11 @@ import {
   ArrowLeft,
   Check,
   CheckCircle2,
-  FileCheck,
-  FileText,
   Info,
-  MoreHorizontal,
+  MoreVertical,
+  PenLine,
   RefreshCw,
   Save,
-  Sparkles,
   TriangleAlert,
 } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -17,7 +15,7 @@ import { toast } from 'sonner';
 
 import type { EditorAggregateResponse } from '@/api/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
+import { Button, type ButtonProps } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   DropdownMenu,
@@ -28,6 +26,7 @@ import {
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { StartAnalysisButton } from '@/features/analysis';
 import { DocumentStatusBadge } from '@/features/documents';
+import { cn } from '@/lib/cn';
 import { getErrorMessage } from '@/lib/errors';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 
@@ -47,10 +46,11 @@ interface EditorScreenProps {
   refetch: () => Promise<unknown>;
 }
 
-const MODE_OPTIONS: { value: ViewMode; label: string; icon: React.ReactNode }[] = [
-  { value: 'original', label: 'Оригинал', icon: <FileText aria-hidden /> },
-  { value: 'suggestions', label: 'Правки', icon: <Sparkles aria-hidden /> },
-  { value: 'clean', label: 'Чистовик', icon: <FileCheck aria-hidden /> },
+// По макету иконка только у «Правок».
+const MODE_OPTIONS: { value: ViewMode; label: string; icon?: React.ReactNode }[] = [
+  { value: 'original', label: 'Оригинал' },
+  { value: 'suggestions', label: 'Правки', icon: <PenLine aria-hidden /> },
+  { value: 'clean', label: 'Чистовик' },
 ];
 
 /** Та же точка, что и lg: у сетки редактора — с неё карточка «парит» над текстом у правки. */
@@ -214,40 +214,43 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-b bg-background/95 px-4 pb-4 pt-2 backdrop-blur-sm md:-mx-8 md:px-8">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button size="icon" variant="ghost" onClick={goBack} aria-label="Назад">
-            <ArrowLeft aria-hidden />
-          </Button>
-          <div className="min-w-0">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-              <h1 className="truncate text-lg font-semibold tracking-tight">{meta.title}</h1>
-              <DocumentStatusBadge status={status} />
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5 tabular-nums">
-                <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
-                {progress.pending} на рассмотрении
-              </span>
-              <span className="inline-flex items-center gap-1.5 tabular-nums">
-                <span aria-hidden className="size-1.5 rounded-full bg-emerald-500" />
-                {progress.accepted} принято
-              </span>
-            </div>
+      {/* Шапка по макету: одна строка, на узких экранах действия переносятся под название. */}
+      <header className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background/95 px-4 py-2 backdrop-blur-sm md:-mx-8 md:px-8 xl:flex-nowrap">
+        <Button size="icon" variant="ghost" onClick={goBack} aria-label="Назад">
+          <ArrowLeft aria-hidden />
+        </Button>
+        <Divider className="hidden sm:block" />
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-3">
+            <h1 className="truncate font-serif text-lg font-medium tracking-tight">{meta.title}</h1>
+            <DocumentStatusBadge status={status} dot className="shrink-0 font-semibold" />
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 tabular-nums">
+              <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
+              {progress.pending} на рассмотрении
+            </span>
+            <span className="inline-flex items-center gap-1.5 tabular-nums">
+              <span aria-hidden className="size-1.5 rounded-full bg-primary" />
+              {progress.accepted} принято
+            </span>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <SegmentedControl<ViewMode>
             sliding
+            size="md"
             ariaLabel="Режим просмотра"
             value={mode}
             onChange={setMode}
             options={MODE_OPTIONS}
           />
+          <Divider className="hidden sm:block" />
           {status === 'ready' ? (
             <StartAnalysisButton
               projectId={projectId}
+              size="default"
               document={{ id: meta.id, name: meta.title, status }}
             />
           ) : null}
@@ -256,13 +259,19 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
             documentId={meta.id}
             title={meta.title}
             format={meta.format}
+            size="default"
             enabled={permissions.can_export && model.unsavedCount === 0}
           />
-          <SaveButton canSave={model.canSave} saving={model.saving} onSave={() => void save()} />
+          <SaveButton
+            size="default"
+            canSave={model.canSave}
+            saving={model.saving}
+            onSave={() => void save()}
+          />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" aria-label="Дополнительные действия">
-                <MoreHorizontal aria-hidden />
+              <Button size="icon" variant="outline" aria-label="Дополнительные действия">
+                <MoreVertical aria-hidden />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -419,6 +428,11 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   );
 }
 
+/** Вертикальный разделитель групп в шапке. */
+function Divider({ className }: { className?: string }) {
+  return <span aria-hidden className={cn('h-8 w-px shrink-0 bg-border', className)} />;
+}
+
 interface LiveStatusInput {
   saving: boolean;
   conflict: boolean;
@@ -439,21 +453,23 @@ function SaveButton({
   canSave,
   saving,
   onSave,
+  size = 'sm',
 }: {
   canSave: boolean;
   saving: boolean;
   onSave: () => void;
+  size?: ButtonProps['size'];
 }) {
   if (!canSave && !saving) {
     return (
-      <Button size="sm" variant="outline" disabled>
+      <Button size={size} variant="outline" disabled>
         <Check aria-hidden />
         Сохранено
       </Button>
     );
   }
   return (
-    <Button size="sm" loading={saving} onClick={onSave}>
+    <Button size={size} loading={saving} onClick={onSave}>
       <Save aria-hidden />
       Сохранить
     </Button>

@@ -10,6 +10,8 @@ interface SegmentedOption<T extends string> {
   icon?: ReactNode;
 }
 
+type SegmentedSize = 'sm' | 'md';
+
 interface SegmentedControlProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
@@ -18,10 +20,17 @@ interface SegmentedControlProps<T extends string> {
   className?: string;
   /** Подложка активного пункта переезжает с пружинной анимацией (переключатель режимов). */
   sliding?: boolean;
+  /** sm — фильтры в панелях, md — переключатель режимов в шапке редактора. */
+  size?: SegmentedSize;
 }
 
 /** Небольшой перелёт в конце — «пружина» без библиотеки анимаций. */
 const SPRING_EASING = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+
+const SIZE_CLASS: Record<SegmentedSize, { container: string; button: string; indicator: string }> = {
+  sm: { container: 'rounded-lg p-1', button: 'h-7 px-3 text-sm', indicator: 'top-1 h-7' },
+  md: { container: 'rounded-xl p-1', button: 'h-9 px-4 text-[15px]', indicator: 'top-1 h-9' },
+};
 
 interface IndicatorBox {
   left: number;
@@ -39,10 +48,12 @@ export function SegmentedControl<T extends string>({
   ariaLabel,
   className,
   sliding = false,
+  size = 'sm',
 }: SegmentedControlProps<T>) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const [indicator, setIndicator] = useState<IndicatorBox | null>(null);
   const activeIndex = options.findIndex((option) => option.value === value);
+  const sizeClass = SIZE_CLASS[size];
 
   useLayoutEffect(() => {
     if (!sliding) return undefined;
@@ -78,14 +89,18 @@ export function SegmentedControl<T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       className={cn(
-        'relative inline-flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1',
+        'relative inline-flex flex-wrap items-center gap-1 bg-muted',
+        sizeClass.container,
         className,
       )}
     >
       {slidingReady ? (
         <span
           aria-hidden
-          className="absolute top-1 h-7 rounded-md bg-card shadow-sm transition-[left,width] duration-500 motion-reduce:transition-none"
+          className={cn(
+            'absolute rounded-md bg-card shadow-sm transition-[left,width] duration-500 motion-reduce:transition-none',
+            sizeClass.indicator,
+          )}
           style={{
             left: indicator.left,
             width: indicator.width,
@@ -116,7 +131,8 @@ export function SegmentedControl<T extends string>({
               }
             }}
             className={cn(
-              'relative inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-all duration-200 [&_svg]:size-3.5 [&_svg]:shrink-0',
+              'relative inline-flex items-center gap-1.5 rounded-md font-medium transition-all duration-200 [&_svg]:size-4 [&_svg]:shrink-0',
+              sizeClass.button,
               active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
               active && !slidingReady && 'bg-card shadow-sm',
             )}
