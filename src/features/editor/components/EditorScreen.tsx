@@ -36,6 +36,7 @@ import { EDITOR_TEXTS } from '../model/texts';
 import { initialViewMode, useEditorModel, type ViewMode } from '../model/useEditorModel';
 
 import { DocumentText } from './DocumentText';
+import { DocxSuggestionsView } from './DocxSuggestionsView';
 import { ExportButton } from './ExportButton';
 import { LeaveGuard } from './LeaveGuard';
 import { OriginalDocxView } from './OriginalDocxView';
@@ -86,9 +87,10 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   const cardRef = useRef<HTMLDivElement>(null);
   const [floating, setFloating] = useState<FloatingBox | null>(null);
 
-  // «Оригинал» для Word — сам файл, отрисованный в браузере; файл запрашивается только в этом режиме.
-  const showDocx = mode === 'original' && meta.format === 'docx';
-  const file = useDocumentFile(projectId, meta.id, showDocx);
+  // Word-документ рисуется из самого файла во всех режимах: в «Оригинале» как есть,
+  // в «Правках» и «Чистовике» — с правками поверх рендера docx-preview.
+  const isDocx = meta.format === 'docx';
+  const file = useDocumentFile(projectId, meta.id, isDocx);
 
   const headerSize: ButtonProps['size'] = tablet ? 'default' : 'sm';
   const projection = mode === 'clean' ? model.projections.clean : model.projections.suggestions;
@@ -249,6 +251,32 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     <p className="text-sm text-muted-foreground">Документ не содержит текста.</p>
   );
 
+  // Word: «Оригинал» — чистый рендер файла; «Правки»/«Чистовик» — тот же рендер с якорями правок.
+  const article = !isDocx ? (
+    plainText
+  ) : mode === 'original' ? (
+    <OriginalDocxView
+      file={file.data}
+      loading={file.isLoading}
+      error={file.error}
+      fallback={plainText}
+    />
+  ) : (
+    <DocxSuggestionsView
+      file={file.data}
+      loading={file.isLoading}
+      error={file.error}
+      mode={mode}
+      suggestions={model.suggestions}
+      sections={model.content.sections}
+      plainText={model.content.plain_text}
+      statusOf={model.statusOf}
+      selectedId={selectedId}
+      onSelect={setSelectedId}
+      fallback={plainText}
+    />
+  );
+
   return (
     <div className="flex flex-col gap-4">
       {/* Шапка по макету: название держит минимальную ширину, группа действий при нехватке места
@@ -360,16 +388,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
           ) : null}
           <div ref={textRef} className="relative">
             <article className="rounded-lg border bg-card px-5 py-4 shadow-sm sm:px-8 sm:py-6 lg:px-10 lg:py-8">
-              {showDocx ? (
-                <OriginalDocxView
-                  file={file.data}
-                  loading={file.isLoading}
-                  error={file.error}
-                  fallback={plainText}
-                />
-              ) : (
-                plainText
-              )}
+              {article}
             </article>
             {popover ? (
               // z-[5] — ниже sticky-шапки (z-10): при прокрутке карточка уходит под неё.
