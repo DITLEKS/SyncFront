@@ -35,6 +35,9 @@ export const queryKeys = {
       ['documents', 'detail', projectId, documentId] as const,
     content: (projectId: string, documentId: string) =>
       ['documents', 'content', projectId, documentId] as const,
+    /** Исходный файл (Blob) для режима «Оригинал»; файл не меняется — кешируется на сессию. */
+    file: (projectId: string, documentId: string) =>
+      ['documents', 'file', projectId, documentId] as const,
     editor: (projectId: string, documentId: string) =>
       ['documents', 'editor', projectId, documentId] as const,
   },

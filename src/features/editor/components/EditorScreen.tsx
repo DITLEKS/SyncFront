@@ -30,6 +30,7 @@ import { cn } from '@/lib/cn';
 import { getErrorMessage } from '@/lib/errors';
 import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 
+import { useDocumentFile } from '../hooks/useDocumentFile';
 import { useResetDecisions, useResetReview } from '../hooks/useEditor';
 import { EDITOR_TEXTS } from '../model/texts';
 import { initialViewMode, useEditorModel, type ViewMode } from '../model/useEditorModel';
@@ -37,6 +38,7 @@ import { initialViewMode, useEditorModel, type ViewMode } from '../model/useEdit
 import { DocumentText } from './DocumentText';
 import { ExportButton } from './ExportButton';
 import { LeaveGuard } from './LeaveGuard';
+import { OriginalDocxView } from './OriginalDocxView';
 import { SuggestionDetails } from './SuggestionDetails';
 import { SuggestionsPanel } from './SuggestionsPanel';
 
@@ -83,6 +85,10 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   const textRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [floating, setFloating] = useState<FloatingBox | null>(null);
+
+  // «Оригинал» для Word — сам файл, отрисованный в браузере; файл запрашивается только в этом режиме.
+  const showDocx = mode === 'original' && meta.format === 'docx';
+  const file = useDocumentFile(projectId, meta.id, showDocx);
 
   const headerSize: ButtonProps['size'] = tablet ? 'default' : 'sm';
   const projection = mode === 'clean' ? model.projections.clean : model.projections.suggestions;
@@ -230,6 +236,19 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     />
   ) : null;
 
+  const plainText = model.content.plain_text ? (
+    <DocumentText
+      mode={mode}
+      originalText={model.content.plain_text}
+      segments={projection.segments}
+      selectedId={selectedId}
+      onSelect={setSelectedId}
+      onUndo={undo}
+    />
+  ) : (
+    <p className="text-sm text-muted-foreground">Документ не содержит текста.</p>
+  );
+
   return (
     <div className="flex flex-col gap-4">
       {/* Шапка по макету: название держит минимальную ширину, группа действий при нехватке места
@@ -341,17 +360,15 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
           ) : null}
           <div ref={textRef} className="relative">
             <article className="rounded-lg border bg-card px-5 py-4 shadow-sm sm:px-8 sm:py-6 lg:px-10 lg:py-8">
-              {model.content.plain_text ? (
-                <DocumentText
-                  mode={mode}
-                  originalText={model.content.plain_text}
-                  segments={projection.segments}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                  onUndo={undo}
+              {showDocx ? (
+                <OriginalDocxView
+                  file={file.data}
+                  loading={file.isLoading}
+                  error={file.error}
+                  fallback={plainText}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground">Документ не содержит текста.</p>
+                plainText
               )}
             </article>
             {popover ? (
