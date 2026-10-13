@@ -73,7 +73,7 @@ interface FloatingBox {
 
 export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) {
   const model = useEditorModel(projectId, editor, refetch);
-  const { meta, status, permissions, progress, decisions, undoBuffered } = model;
+  const { meta, status, permissions, progress, decisions, undoBuffered, decideSuggestion } = model;
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<ViewMode>(() => initialViewMode(meta.view_mode));
@@ -115,10 +115,10 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   // Быстрое решение кнопками в списке панели: то же, что из карточки, без правки текста.
   const decideFromPanel = useCallback(
     (id: string, decision: PanelDecision) => {
-      model.decideSuggestion(id, decision);
+      decideSuggestion(id, decision);
       setSelectedId(null);
     },
-    [model.decideSuggestion],
+    [decideSuggestion],
   );
 
   // Отмена решения: из карточки и кнопкой на блоке в тексте. Несохранённое снимается локально,
