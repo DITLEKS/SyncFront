@@ -1,5 +1,5 @@
 import { observeElementRect, useVirtualizer } from '@tanstack/react-virtual';
-import { CheckCircle2, FileText, Inbox, ListChecks, TriangleAlert } from 'lucide-react';
+import { Check, CheckCircle2, FileText, Inbox, ListChecks, TriangleAlert, X } from 'lucide-react';
 import { memo, useEffect, useRef, useState } from 'react';
 
 import type { SuggestionResponse } from '@/api/types';
@@ -22,6 +22,7 @@ import { EMPTY_FILTER_TEXTS, ISSUE_TEXTS } from '../model/texts';
 import { ChangeTypeLabel } from './ChangeTypeLabel';
 
 export type SuggestionFilter = 'pending' | 'decided' | 'all';
+export type PanelDecision = Exclude<SuggestionStatus, 'pending'>;
 
 interface SuggestionsPanelProps {
   suggestions: SuggestionResponse[];
@@ -31,6 +32,10 @@ interface SuggestionsPanelProps {
   progress: ReviewProgress;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Можно ли принимать/отклонять прямо из списка (права ревьюера). */
+  canReview?: boolean;
+  /** Быстрое решение по выбранной правке без открытия карточки. */
+  onDecide?: (id: string, decision: PanelDecision) => void;
   /** Карточка выбранной правки и блок завершения — над списком. */
   header?: React.ReactNode;
 }
@@ -47,6 +52,8 @@ export function SuggestionsPanel({
   progress,
   selectedId,
   onSelect,
+  canReview = false,
+  onDecide,
   header,
 }: SuggestionsPanelProps) {
   const [filter, setFilter] = useState<SuggestionFilter>('pending');
@@ -65,7 +72,9 @@ export function SuggestionsPanel({
       issue={located[s.id]?.issue ?? null}
       selected={s.id === selectedId}
       unsaved={unsavedIds.has(s.id)}
+      canReview={canReview}
       onSelect={onSelect}
+      onDecide={onDecide}
     />
   );
 
@@ -81,20 +90,22 @@ export function SuggestionsPanel({
             {progress.decided}/{progress.total}
           </span>
         </div>
-        <Progress value={progress.percent / 100} label="Прогресс проверки" />
+        {/* Трек на фоне панели должен быть виден и при 0% — поэтому bg-border, а не bg-muted. */}
+        <Progress value={progress.percent / 100} label="Прогресс проверки" className="bg-border" />
         <p className="text-xs text-muted-foreground">Ревью завершено на {progress.percent}%</p>
       </div>
 
       {header}
 
+      {/* По макету табы без счётчиков: числа уже есть в шапке и в «решено/всего». */}
       <SegmentedControl<SuggestionFilter>
         ariaLabel="Фильтр предложений"
         value={filter}
         onChange={setFilter}
         options={[
-          { value: 'pending', label: 'На рассмотрении', count: progress.pending },
-          { value: 'decided', label: 'Решено', count: progress.decided },
-          { value: 'all', label: 'Все', count: progress.total },
+          { value: 'pending', label: 'На рассмотрении' },
+          { value: 'decided', label: 'Решено' },
+          { value: 'all', label: 'Все' },
         ]}
       />
 
@@ -103,7 +114,7 @@ export function SuggestionsPanel({
       ) : isVirtualized(filtered.length) ? (
         <VirtualSuggestionList items={filtered} selectedId={selectedId} renderCard={renderCard} />
       ) : (
-        <ul className="space-y-2" aria-label="Список предложений">
+        <ul className="space-y-1" aria-label="Список предложений">
           {filtered.map((s) => (
             <li key={s.id}>{renderCard(s)}</li>
           ))}
@@ -157,7 +168,7 @@ function VirtualSuggestionList({ items, selectedId, renderCard }: VirtualSuggest
               key={row.key}
               ref={virtualizer.measureElement}
               data-index={row.index}
-              className="absolute left-0 top-0 w-full pb-2"
+              className="absolute left-0 top-0 w-full pb-1"
               style={{ transform: `translateY(${row.start}px)` }}
             >
               {renderCard(suggestion)}
@@ -175,55 +186,90 @@ interface SuggestionCardProps {
   issue: LocateIssue | null;
   selected: boolean;
   unsaved: boolean;
+  canReview: boolean;
   onSelect: (id: string) => void;
+  onDecide?: (id: string, decision: PanelDecision) => void;
 }
 
+/**
+ * Элемент списка по макету: обычные правки — плоские строки без рамки, выбранная — карточка
+ * с кнопками «Принять / Отклонить». Обёртка — div, чтобы кнопки действий не оказались
+ * внутри кнопки выбора.
+ */
 const SuggestionCard = memo(function SuggestionCard({
   suggestion: s,
   status,
   issue,
   selected,
   unsaved,
+  canReview,
   onSelect,
+  onDecide,
 }: SuggestionCardProps) {
+  const showActions = selected && status === 'pending' && canReview && Boolean(onDecide);
   return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={() => onSelect(s.id)}
+    <div
       className={cn(
-        'w-full space-y-1.5 rounded-lg border bg-card p-3 text-left text-sm shadow-sm transition-colors hover:bg-accent/50',
-        selected && 'border-primary ring-1 ring-primary',
+        'rounded-xl p-3 text-sm transition-colors',
+        selected ? 'border bg-card shadow-sm' : 'border border-transparent hover:bg-accent/50',
       )}
     >
-      <span className="flex items-center gap-2">
-        <ChangeTypeLabel type={s.change_type} />
-        {status !== 'pending' ? (
-          <span
-            className={cn(
-              'inline-flex items-center gap-1 text-xs font-medium',
-              status === 'accepted' ? 'text-emerald-700' : 'text-muted-foreground',
-            )}
-          >
-            {status === 'accepted' ? <CheckCircle2 className="size-3" aria-hidden /> : null}
-            {decisionLabel[status]}
-            {unsaved ? ' · не сохранено' : ''}
+      <button
+        type="button"
+        aria-pressed={selected}
+        onClick={() => onSelect(s.id)}
+        className="w-full space-y-1.5 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        <span className="flex items-center gap-2">
+          <ChangeTypeLabel type={s.change_type} />
+          {status !== 'pending' ? (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 text-xs font-medium',
+                status === 'accepted' ? 'text-emerald-700' : 'text-muted-foreground',
+              )}
+            >
+              {status === 'accepted' ? <CheckCircle2 className="size-3" aria-hidden /> : null}
+              {decisionLabel[status]}
+              {unsaved ? ' · не сохранено' : ''}
+            </span>
+          ) : null}
+          {issue ? (
+            <TriangleAlert
+              className="ml-auto size-4 shrink-0 text-amber-600"
+              aria-label={ISSUE_TEXTS[issue]}
+            />
+          ) : null}
+        </span>
+        <span className="line-clamp-2 block break-words text-foreground">{shortText(s)}</span>
+        {s.section_ref ? (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <FileText className="size-3 shrink-0" aria-hidden />
+            <span className="truncate">{s.section_ref}</span>
           </span>
         ) : null}
-        {issue ? (
-          <TriangleAlert
-            className="ml-auto size-4 shrink-0 text-amber-600"
-            aria-label={ISSUE_TEXTS[issue]}
-          />
-        ) : null}
-      </span>
-      <span className="line-clamp-2 block break-words text-foreground">{shortText(s)}</span>
-      {s.section_ref ? (
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          <FileText className="size-3 shrink-0" aria-hidden />
-          <span className="truncate">{s.section_ref}</span>
-        </span>
+      </button>
+
+      {showActions ? (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onDecide?.(s.id, 'accepted')}
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-primary/10 text-xs font-medium text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Check className="size-3.5" aria-hidden />
+            Принять
+          </button>
+          <button
+            type="button"
+            onClick={() => onDecide?.(s.id, 'rejected')}
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-muted text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="size-3.5" aria-hidden />
+            Отклонить
+          </button>
+        </div>
       ) : null}
-    </button>
+    </div>
   );
 });

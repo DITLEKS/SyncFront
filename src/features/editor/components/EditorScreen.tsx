@@ -41,7 +41,7 @@ import { ExportButton } from './ExportButton';
 import { LeaveGuard } from './LeaveGuard';
 import { OriginalDocxView } from './OriginalDocxView';
 import { SuggestionDetails } from './SuggestionDetails';
-import { SuggestionsPanel } from './SuggestionsPanel';
+import { SuggestionsPanel, type PanelDecision } from './SuggestionsPanel';
 
 interface EditorScreenProps {
   projectId: string;
@@ -111,6 +111,15 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
       target?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
     });
   }, []);
+
+  // Быстрое решение кнопками в списке панели: то же, что из карточки, без правки текста.
+  const decideFromPanel = useCallback(
+    (id: string, decision: PanelDecision) => {
+      model.decideSuggestion(id, decision);
+      setSelectedId(null);
+    },
+    [model.decideSuggestion],
+  );
 
   // Отмена решения: из карточки и кнопкой на блоке в тексте. Несохранённое снимается локально,
   // сохранённое — запросом на бэкенд.
@@ -414,6 +423,8 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
             progress={progress}
             selectedId={selectedId}
             onSelect={selectFromPanel}
+            canReview={permissions.can_review}
+            onDecide={decideFromPanel}
             header={
               <>
                 {allProcessed ? (
