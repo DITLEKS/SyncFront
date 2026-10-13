@@ -55,6 +55,8 @@ const MODE_OPTIONS: { value: ViewMode; label: string; icon?: React.ReactNode }[]
 
 /** Та же точка, что и lg: у сетки редактора — с неё карточка «парит» над текстом у правки. */
 const DESKTOP_QUERY = '(min-width: 1024px)';
+/** С md: элементы шапки полного размера, ниже — компактные. */
+const TABLET_QUERY = '(min-width: 768px)';
 /** Ширина парящей карточки по макету (34rem); на узкой статье ужимается до её правого края. */
 const CARD_WIDTH = 544;
 /** Зазор между блоком правки и карточкой. */
@@ -77,10 +79,12 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   const resetReview = useResetReview(projectId, meta.id);
   const resetDecisions = useResetDecisions(projectId, meta.id);
   const desktop = useMediaQuery(DESKTOP_QUERY);
+  const tablet = useMediaQuery(TABLET_QUERY);
   const textRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [floating, setFloating] = useState<FloatingBox | null>(null);
 
+  const headerSize: ButtonProps['size'] = tablet ? 'default' : 'sm';
   const projection = mode === 'clean' ? model.projections.clean : model.projections.suggestions;
   // В «Оригинале» правок нет — карточка предложения там не показывается вовсе.
   const selected =
@@ -198,6 +202,16 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     unsaved: model.unsavedCount,
   });
 
+  // Повторная проверка живёт в панели, а не в шапке: в ready шапка и так самая плотная.
+  const reanalyze =
+    status === 'ready' ? (
+      <StartAnalysisButton
+        projectId={projectId}
+        size="sm"
+        document={{ id: meta.id, name: meta.title, status }}
+      />
+    ) : null;
+
   const details = selected ? (
     <SuggestionDetails
       key={selected.id}
@@ -218,63 +232,63 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Шапка по макету: одна строка, на узких экранах действия переносятся под название. */}
-      <header className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background/95 px-4 py-2 backdrop-blur-sm md:-mx-8 md:px-8 xl:flex-nowrap">
+      {/* Шапка по макету: название держит минимальную ширину, группа действий при нехватке места
+          переносится на вторую строку целиком, а не сжимает название и статус. */}
+      <header className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background/95 px-4 py-2 backdrop-blur-sm md:-mx-8 md:px-8">
         <Button size="icon" variant="ghost" onClick={goBack} aria-label="Назад">
           <ArrowLeft aria-hidden />
         </Button>
         <Divider className="hidden sm:block" />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[12rem] flex-1">
           <div className="flex min-w-0 items-center gap-3">
-            <h1 className="truncate font-serif text-lg font-medium tracking-tight">{meta.title}</h1>
+            <h1 className="truncate font-serif text-base font-medium tracking-tight md:text-lg">
+              {meta.title}
+            </h1>
             <DocumentStatusBadge status={status} dot className="shrink-0 font-semibold" />
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5 tabular-nums">
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums">
               <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
               {progress.pending} на рассмотрении
             </span>
-            <span className="inline-flex items-center gap-1.5 tabular-nums">
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap tabular-nums">
               <span aria-hidden className="size-1.5 rounded-full bg-primary" />
               {progress.accepted} принято
             </span>
           </div>
         </div>
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2 sm:flex-nowrap">
           <SegmentedControl<ViewMode>
             sliding
-            size="md"
+            size={tablet ? 'md' : 'sm'}
             ariaLabel="Режим просмотра"
             value={mode}
             onChange={setMode}
             options={MODE_OPTIONS}
           />
           <Divider className="hidden sm:block" />
-          {status === 'ready' ? (
-            <StartAnalysisButton
-              projectId={projectId}
-              size="default"
-              document={{ id: meta.id, name: meta.title, status }}
-            />
-          ) : null}
           <ExportButton
             projectId={projectId}
             documentId={meta.id}
             title={meta.title}
             format={meta.format}
-            size="default"
+            size={headerSize}
             enabled={permissions.can_export && model.unsavedCount === 0}
           />
           <SaveButton
-            size="default"
+            size={headerSize}
             canSave={model.canSave}
             saving={model.saving}
             onSave={() => void save()}
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="outline" aria-label="Дополнительные действия">
+              <Button
+                size={tablet ? 'icon' : 'iconSm'}
+                variant="outline"
+                aria-label="Дополнительные действия"
+              >
                 <MoreVertical aria-hidden />
               </Button>
             </DropdownMenuTrigger>
@@ -317,7 +331,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
         </Alert>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section aria-label="Текст документа" className="min-w-0 space-y-3">
           {mode === 'original' ? (
             <Alert>
@@ -326,7 +340,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
             </Alert>
           ) : null}
           <div ref={textRef} className="relative">
-            <article className="rounded-lg border bg-card px-6 py-5 shadow-sm sm:px-10 sm:py-8">
+            <article className="rounded-lg border bg-card px-5 py-4 shadow-sm sm:px-8 sm:py-6 lg:px-10 lg:py-8">
               {model.content.plain_text ? (
                 <DocumentText
                   mode={mode}
@@ -368,7 +382,10 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
                   completed ? (
                     <Alert variant="success">
                       <CheckCircle2 aria-hidden />
-                      <AlertDescription>{EDITOR_TEXTS.completed}</AlertDescription>
+                      <AlertDescription className="space-y-2">
+                        <p>{EDITOR_TEXTS.completed}</p>
+                        {reanalyze ? <span className="flex">{reanalyze}</span> : null}
+                      </AlertDescription>
                     </Alert>
                   ) : (
                     <Alert>
@@ -386,11 +403,14 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
                               Просмотреть чистовик
                             </Button>
                           ) : null}
+                          {reanalyze}
                         </span>
                       </AlertDescription>
                     </Alert>
                   )
-                ) : null}
+                ) : (
+                  reanalyze
+                )}
                 {popover ? null : details}
               </>
             }
