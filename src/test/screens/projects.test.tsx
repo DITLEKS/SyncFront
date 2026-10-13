@@ -181,4 +181,86 @@ describe('Раздел «Проекты»', () => {
       ).toEqual({ name: 'Без оформления', description: null }),
     );
   });
+
+  it('меню карточки с клавиатуры: Enter открывает, стрелка ведёт по пунктам, Escape возвращает фокус', async () => {
+    addProject(db, { name: 'Клавиатура' });
+    const user = userEvent.setup();
+    const { router } = renderProjects();
+    const trigger = await screen.findByRole('button', { name: 'Действия с проектом Клавиатура' });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    const items = await screen.findAllByRole('menuitem');
+    await waitFor(() => expect(items[0]).toHaveFocus());
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'Удалить' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(router.state.location.pathname).toBe('/projects');
+  });
+
+  it('отмена удаления не отправляет запрос; фокус по умолчанию на «Отмена»', async () => {
+    addProject(db, { name: 'Остаётся' });
+    const user = userEvent.setup();
+    renderProjects();
+    await user.click(await screen.findByRole('button', { name: 'Действия с проектом Остаётся' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Удалить' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Удалить проект?' });
+    const cancel = within(dialog).getByRole('button', { name: 'Отмена' });
+    await waitFor(() => expect(cancel).toHaveFocus());
+    await user.click(cancel);
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'Остаётся' })).toBeInTheDocument();
+    expect(db.requests.filter((r) => r.method === 'DELETE')).toHaveLength(0);
+  });
+
+  it('ошибка удаления показывает текст сервера, окно остаётся открытым, проект на месте', async () => {
+    server.use(
+      http.delete('/api/v1/projects/:projectId', () =>
+        HttpResponse.json(
+          { detail: 'Проект заблокирован: идёт анализ документов' },
+          { status: 423 },
+        ),
+      ),
+    );
+    addProject(db, { name: 'Защищённый' });
+    const user = userEvent.setup();
+    renderProjects();
+    await user.click(await screen.findByRole('button', { name: 'Действия с проектом Защищённый' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Удалить' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Удалить проект?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Удалить' }));
+    expect(
+      await within(dialog).findByText('Проект заблокирован: идёт анализ документов'),
+    ).toBeInTheDocument();
+    // Пока модальное окно открыто, страница под ним aria-hidden — карточку проверяем после закрытия.
+    await user.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'Защищённый' })).toBeInTheDocument();
+  });
+
+  it('ошибка переименования остаётся в окне, введённое название не теряется', async () => {
+    server.use(
+      http.patch('/api/v1/projects/:projectId', () =>
+        HttpResponse.json({ detail: 'Проект с таким названием уже существует' }, { status: 409 }),
+      ),
+    );
+    addProject(db, { name: 'Исходное' });
+    const user = userEvent.setup();
+    renderProjects();
+    await user.click(await screen.findByRole('button', { name: 'Действия с проектом Исходное' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Переименовать' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Переименовать проект' });
+    const input = within(dialog).getByLabelText('Название проекта');
+    await user.clear(input);
+    await user.type(input, 'Дубль');
+    await user.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
+    expect(
+      await within(dialog).findByText('Проект с таким названием уже существует'),
+    ).toBeInTheDocument();
+    expect(input).toHaveValue('Дубль');
+    await user.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'Исходное' })).toBeInTheDocument();
+  });
 });
