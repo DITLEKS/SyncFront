@@ -53,7 +53,8 @@ export function LeaveGuard({ dirty, saving, saveError, onSave, onDiscard }: Leav
     <AlertDialog.Root open onOpenChange={(open) => !open && !saving && stay()}>
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 z-50 bg-slate-950/40" />
-        <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border bg-card p-6 shadow-lg">
+        {/* Три кнопки в ряд не помещаются в max-w-md — карточка шире, ряд переносится при нехватке места. */}
+        <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border bg-card p-6 shadow-lg">
           <AlertDialog.Title className="text-lg font-semibold">
             Несохранённые изменения
           </AlertDialog.Title>
@@ -66,7 +67,7 @@ export function LeaveGuard({ dirty, saving, saveError, onSave, onDiscard }: Leav
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : null}
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
             <AlertDialog.Cancel asChild>
               <Button variant="outline" disabled={saving}>
                 Остаться
