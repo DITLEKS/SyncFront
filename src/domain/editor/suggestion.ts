@@ -34,6 +34,16 @@ export interface EditorSuggestion {
   change_type: ChangeType;
   original_text?: string | null;
   suggested_text?: string | null;
+  /** Текст, которым пользователь заменил suggested_text при принятии (уже сохранён на сервере). */
+  edited_text?: string | null;
   section_ref?: string | null;
   status: SuggestionStatus;
+}
+
+/**
+ * Текст, который попадёт в документ при принятии: несохранённая правка пользователя важнее
+ * сохранённой, сохранённая — важнее текста ИИ. Так же выбирает экспорт SyncBack.
+ */
+export function effectiveNewText(suggestion: EditorSuggestion, draft?: string | null): string {
+  return draft ?? suggestion.edited_text ?? suggestion.suggested_text ?? '';
 }

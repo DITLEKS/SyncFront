@@ -7,7 +7,8 @@
  *   каждая — к уже изменённому тексту;
  * - modify/delete заменяют первое вхождение original_text во всём тексте;
  *   в docx вхождение ищется внутри одного абзаца, поэтому фрагмент с переводом строки не применится;
- * - add дописывается в конец документа.
+ * - add дописывается в конец документа;
+ * - новый текст правки берётся из newTextOf: отредактированный пользователем важнее текста ИИ.
  */
 import type { ChangeType, EditorSuggestion, SuggestionStatus } from './suggestion';
 
@@ -61,6 +62,8 @@ export interface ProjectionInput {
   /** В порядке ответа сервера: так же их применяет экспорт. */
   suggestions: readonly EditorSuggestion[];
   statusOf: (suggestion: EditorSuggestion) => SuggestionStatus;
+  /** Новый текст правки с учётом правок пользователя; по умолчанию — suggested_text. */
+  newTextOf?: (suggestion: EditorSuggestion) => string;
   /**
    * Где показывать добавления. Экспорт дописывает их в конец документа (`end`);
    * в режиме «Правки» читать удобнее рядом с разделом (`section`).
@@ -116,19 +119,24 @@ export function sectionsInUtf16(
   }));
 }
 
-function changeOf(suggestion: EditorSuggestion, status: SuggestionStatus): ChangeSegment {
+function changeOf(
+  suggestion: EditorSuggestion,
+  status: SuggestionStatus,
+  newText: string,
+): ChangeSegment {
   return {
     kind: 'change',
     id: suggestion.id,
     changeType: suggestion.change_type,
     status,
     oldText: suggestion.original_text ?? '',
-    newText: suggestion.suggested_text ?? '',
+    newText,
   };
 }
 
 export function buildProjection(input: ProjectionInput): Projection {
   const { text, format, suggestions, statusOf, addPlacement } = input;
+  const newTextOf = input.newTextOf ?? ((s: EditorSuggestion) => s.suggested_text ?? '');
   const sections = sectionsInUtf16(text, input.sections);
   const located: Record<string, LocatedSuggestion> = {};
   let pieces: Piece[] = [{ kind: 'text', text, origin: 0 }];
@@ -194,7 +202,7 @@ export function buildProjection(input: ProjectionInput): Projection {
     const replacement: Piece[] = [];
     if (start > 0)
       replacement.push({ kind: 'text', text: piece.text.slice(0, start), origin: piece.origin });
-    replacement.push(changeOf(suggestion, status));
+    replacement.push(changeOf(suggestion, status, newTextOf(suggestion)));
     const tail = piece.text.slice(start + old.length);
     if (tail) replacement.push({ kind: 'text', text: tail, origin: originStart + old.length });
     pieces = [...pieces.slice(0, target), ...replacement, ...pieces.slice(target + 1)];
@@ -206,9 +214,8 @@ export function buildProjection(input: ProjectionInput): Projection {
       addPlacement === 'section' && suggestion.section_ref
         ? sections.find((s) => s.ref === suggestion.section_ref)
         : undefined;
-    pieces = section
-      ? insertAt(pieces, section.end_offset, changeOf(suggestion, status))
-      : [...pieces, changeOf(suggestion, status)];
+    const change = changeOf(suggestion, status, newTextOf(suggestion));
+    pieces = section ? insertAt(pieces, section.end_offset, change) : [...pieces, change];
   }
 
   return { segments: pieces.map(toSegment), located };
