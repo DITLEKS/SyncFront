@@ -226,11 +226,12 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
       suggestion={selected}
       status={model.statusOf(selected)}
       unsaved={unsavedIds.has(selected.id)}
+      newText={model.newTextOf(selected)}
       located={projection.located[selected.id]}
       canReview={permissions.can_review}
       undoing={resetDecisions.isPending}
-      onDecide={(decision) => {
-        model.decideSuggestion(selected.id, decision);
+      onDecide={(decision, editedText) => {
+        model.decideSuggestion(selected.id, decision, editedText);
         setSelectedId(null);
       }}
       onUndo={() => undo(selected.id)}
@@ -271,6 +272,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
       sections={model.content.sections}
       plainText={model.content.plain_text}
       statusOf={model.statusOf}
+      newTextOf={model.newTextOf}
       selectedId={selectedId}
       onSelect={setSelectedId}
       fallback={plainText}
