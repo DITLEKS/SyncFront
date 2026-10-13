@@ -10,6 +10,17 @@ import { renderDocx } from '../lib/renderDocx';
 export const DOCX_RENDER_FAILED =
   'Не удалось отрисовать исходный файл — показан текст без форматирования.';
 
+// Стили контейнера рендера. Tailwind-preflight обнуляет рамки у всех элементов, а docx-preview
+// не всегда переводит рамки из стиля таблицы в CSS — поэтому запасные рамки для таблиц.
+// Явные inline-рамки из документа имеют приоритет над этими классами.
+const HOST_CLASS = cn(
+  'docx-host',
+  '[&_.docx]:!min-h-0 [&_.docx]:!w-auto [&_.docx]:!bg-transparent [&_.docx]:!p-0 [&_.docx]:!shadow-none',
+  '[&_.docx_table]:my-3 [&_.docx_table]:w-full [&_.docx_table]:border-collapse',
+  '[&_.docx_td]:border [&_.docx_td]:border-border [&_.docx_td]:px-2 [&_.docx_td]:py-1 [&_.docx_td]:align-top',
+  '[&_.docx_th]:border [&_.docx_th]:border-border [&_.docx_th]:px-2 [&_.docx_th]:py-1 [&_.docx_th]:align-top',
+);
+
 interface OriginalDocxViewProps {
   file: Blob | undefined;
   loading: boolean;
@@ -80,13 +91,7 @@ export function OriginalDocxView({
       ) : null}
       {failed || empty ? fallback : null}
       {/* Контейнер смонтирован всегда: рендер идёт в него, пока сверху показан скелетон. */}
-      <div
-        ref={hostRef}
-        className={cn(
-          'docx-host [&_.docx]:!min-h-0 [&_.docx]:!w-auto [&_.docx]:!bg-transparent [&_.docx]:!p-0 [&_.docx]:!shadow-none',
-          (busy || failed) && 'hidden',
-        )}
-      />
+      <div ref={hostRef} className={cn(HOST_CLASS, (busy || failed) && 'hidden')} />
     </div>
   );
 }
