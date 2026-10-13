@@ -1,4 +1,5 @@
 import { Check, FileText, MessageSquare, TriangleAlert, Undo2, X } from 'lucide-react';
+import { useState } from 'react';
 
 import type { SuggestionResponse } from '@/api/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -13,10 +14,13 @@ interface SuggestionDetailsProps {
   status: SuggestionStatus;
   /** Решение есть только в буфере и ещё не отправлено. */
   unsaved: boolean;
+  /** Новый текст с учётом правки пользователя (несохранённой или сохранённой). */
+  newText: string;
   located: LocatedSuggestion | undefined;
   canReview: boolean;
   undoing: boolean;
-  onDecide: (decision: Decision) => void;
+  /** editedText передаётся только с accepted и только если текст отличается от предложенного ИИ. */
+  onDecide: (decision: Decision, editedText?: string) => void;
   onUndo: () => void;
   onClose: () => void;
 }
@@ -34,13 +38,15 @@ function Fragment({ label, children }: { label: string; children: React.ReactNod
 
 /**
  * Карточка «Предложение ИИ» по макету. Блок «источника» пока показывает раздел документа:
- * источника правки в SuggestionResponse нет (SyncBack#70). Новый текст только для чтения:
- * контракт ревью не принимает текст (SyncBack#69).
+ * источника правки в SuggestionResponse нет (SyncBack#70). «Новый текст» нерассмотренной
+ * правки можно отредактировать перед принятием — текст уходит в PUT /review как edited_text
+ * (SyncBack#73) и при экспорте заменяет текст ИИ.
  */
 export function SuggestionDetails({
   suggestion,
   status,
   unsaved,
+  newText,
   located,
   canReview,
   undoing,
@@ -49,10 +55,20 @@ export function SuggestionDetails({
   onClose,
 }: SuggestionDetailsProps) {
   const { change_type: type } = suggestion;
+  const [draft, setDraft] = useState(newText);
   const confidence =
     typeof suggestion.confidence_score === 'number'
       ? Math.round(suggestion.confidence_score * 100)
       : null;
+
+  const editable = status === 'pending' && canReview && type !== 'delete';
+  const aiText = (suggestion.suggested_text ?? '').trim();
+  const trimmedDraft = draft.trim();
+  const edited = (editable ? trimmedDraft : newText.trim()) !== aiText;
+
+  const accept = () => {
+    onDecide('accepted', editable && edited ? trimmedDraft : undefined);
+  };
 
   return (
     <section
@@ -98,8 +114,29 @@ export function SuggestionDetails({
         ) : null}
         {type === 'delete' ? (
           <p className="text-sm text-red-700">{EDITOR_TEXTS.deleteMessage}</p>
+        ) : editable ? (
+          <div className="space-y-1">
+            <label
+              htmlFor={`new-text-${suggestion.id}`}
+              className="block text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            >
+              Новый текст
+            </label>
+            <textarea
+              id={`new-text-${suggestion.id}`}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              rows={4}
+              className="min-h-[7rem] w-full resize-y rounded-md border bg-muted/40 p-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <p className="text-xs text-muted-foreground">
+              {edited
+                ? 'Текст изменён — в документ попадёт ваш вариант.'
+                : 'Текст можно отредактировать перед принятием.'}
+            </p>
+          </div>
         ) : (
-          <Fragment label="Новый текст">{suggestion.suggested_text}</Fragment>
+          <Fragment label={edited ? 'Новый текст (отредактирован)' : 'Новый текст'}>{newText}</Fragment>
         )}
         {type === 'add' ? (
           <p className="text-xs text-muted-foreground">{EDITOR_TEXTS.addAtEnd}</p>
@@ -118,7 +155,7 @@ export function SuggestionDetails({
               <Button size="sm" variant="ghost" onClick={() => onDecide('rejected')}>
                 Отклонить
               </Button>
-              <Button size="sm" onClick={() => onDecide('accepted')}>
+              <Button size="sm" onClick={accept} disabled={editable && trimmedDraft === ''}>
                 <Check aria-hidden />
                 Принять
               </Button>

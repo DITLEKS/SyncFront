@@ -29,6 +29,8 @@ interface DocxSuggestionsViewProps {
   sections: readonly DocumentSection[];
   plainText: string;
   statusOf: (suggestion: EditorSuggestion) => SuggestionStatus;
+  /** Новый текст правки с учётом правок пользователя. */
+  newTextOf: (suggestion: EditorSuggestion) => string;
   selectedId: string | null;
   onSelect: (id: string) => void;
   /** Плоский текст с правками — если файл не загрузился или не отрисовался. */
@@ -57,6 +59,7 @@ export function DocxSuggestionsView({
   sections,
   plainText,
   statusOf,
+  newTextOf,
   selectedId,
   onSelect,
   fallback,
@@ -89,7 +92,7 @@ export function DocxSuggestionsView({
     };
   }, [file, suggestions, sections, plainText, render]);
 
-  // Решения, режим и выделение — только перерисовка якорей, без повторного рендера документа.
+  // Решения, режим, выделение и правки текста — только перерисовка якорей, без повторного рендера.
   useEffect(() => {
     if (!report) return;
     for (const suggestion of suggestions) {
@@ -102,13 +105,13 @@ export function DocxSuggestionsView({
         {
           changeType: suggestion.change_type,
           status: statusOf(suggestion),
-          newText: suggestion.suggested_text ?? '',
+          newText: newTextOf(suggestion),
           selected: suggestion.id === selectedId,
         },
         mode,
       );
     }
-  }, [report, suggestions, statusOf, selectedId, mode]);
+  }, [report, suggestions, statusOf, newTextOf, selectedId, mode]);
 
   const handleClick = (event: MouseEvent<HTMLDivElement>) => {
     const id = anchorIdOf(event.target);
