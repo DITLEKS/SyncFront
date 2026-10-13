@@ -82,10 +82,14 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   const [floating, setFloating] = useState<FloatingBox | null>(null);
 
   const projection = mode === 'clean' ? model.projections.clean : model.projections.suggestions;
-  const selected = model.suggestions.find((s) => s.id === selectedId) ?? null;
+  // В «Оригинале» правок нет — карточка предложения там не показывается вовсе.
+  const selected =
+    mode === 'original' ? null : (model.suggestions.find((s) => s.id === selectedId) ?? null);
   const unsavedIds = useMemo(() => new Set(Object.keys(decisions)), [decisions]);
 
+  // Выбор из панели в «Оригинале» переключает в «Правки» — иначе показать правку негде.
   const selectFromPanel = useCallback((id: string) => {
+    setMode((current) => (current === 'original' ? 'suggestions' : current));
     setSelectedId(id);
     // Прокручиваем после отрисовки выделения; в jsdom scrollIntoView нет.
     requestAnimationFrame(() => {
@@ -109,14 +113,14 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     [decisions, undoBuffered, resetDecisions],
   );
 
-  // Выбранная правка исчезла (новый анализ): закрываем карточку.
+  // Выбранная правка исчезла (новый анализ) или открыт «Оригинал»: сбрасываем выбор.
   useEffect(() => {
     if (selectedId && !selected) setSelectedId(null);
   }, [selectedId, selected]);
 
   // На десктопе карточка «парит» над текстом рядом с выбранным блоком, не сдвигая ни текст,
-  // ни панель. На узком экране, в «Оригинале» и если фрагмент не найден — остаётся в правой панели.
-  const canFloat = desktop && selected !== null && mode !== 'original';
+  // ни панель. На узком экране и если фрагмент не найден — остаётся в правой панели.
+  const canFloat = desktop && selected !== null;
 
   // Считаем позицию относительно обёртки статьи. По умолчанию карточка под блоком; если снизу
   // она вышла бы за край статьи (и растянула страницу) — над блоком. Высота карточки
