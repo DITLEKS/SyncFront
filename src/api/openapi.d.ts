@@ -275,6 +275,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/documents/{document_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Исходный файл документа для просмотра в браузере
+         * @description Байты исходника без правок, под обычной авторизацией API.
+         *
+         *     В отличие от /download, не требует доступа браузера к хранилищу напрямую:
+         *     фронт рендерит .docx в режиме «Оригинал» из этого ответа.
+         */
+        get: operations["get_document_file_api_v1_projects__project_id__documents__document_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/documents/{document_id}/export": {
         parameters: {
             query?: never;
@@ -1650,6 +1673,11 @@ export interface components {
              * @enum {string}
              */
             decision: "accepted" | "rejected";
+            /**
+             * Edited Text
+             * @description Скорректированный текст правки; допустим только вместе с decision='accepted'
+             */
+            edited_text?: string | null;
         };
         /**
          * SuggestionResponse
@@ -1682,6 +1710,11 @@ export interface components {
             original_text?: string | null;
             /** Suggested Text */
             suggested_text?: string | null;
+            /**
+             * Edited Text
+             * @description Текст, которым пользователь заменил suggested_text при принятии; None — без правки
+             */
+            edited_text?: string | null;
             /**
              * Rationale
              * @description Обоснование правки от модели
@@ -2421,6 +2454,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentDownloadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_document_file_api_v1_projects__project_id__documents__document_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": unknown;
                 };
             };
             /** @description Validation Error */
