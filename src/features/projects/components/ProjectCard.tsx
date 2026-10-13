@@ -24,6 +24,9 @@ interface ProjectCardProps {
  * Вся карточка — ссылка на проект; меню лежит поверх ссылки отдельным элементом,
  * поэтому клик по нему не открывает проект. Меню видно при наведении и при фокусе с клавиатуры.
  * Декоративные слои (полоска цвета и градиент) лежат в конце разметки и не участвуют в hit-testing.
+ *
+ * Кольцо фокуса — только при клавиатурном фокусе ссылки (:has(a:focus-visible)); focus-within загорался
+ * и после клика мышью, оставляя тёмную обводку. На hover анимируется только тень.
  */
 export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
   const documents = project.document_count;
@@ -31,7 +34,7 @@ export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
   const color = projectColor(project);
 
   return (
-    <article className="group relative isolate flex min-h-64 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-200 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:-translate-y-0.5 hover:border-border hover:shadow-md motion-reduce:hover:translate-y-0">
+    <article className="group relative isolate flex min-h-64 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-shadow duration-200 ease-out hover:shadow-md has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-offset-2 motion-reduce:transition-none">
       <div className="flex flex-1 flex-col px-5 pb-5 pt-6">
         <div className="flex items-start gap-4 pr-8">
           <ProjectIcon
