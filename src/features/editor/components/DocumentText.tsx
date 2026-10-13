@@ -44,7 +44,7 @@ export function DocumentText({
 }: DocumentTextProps) {
   return (
     <div
-      className="whitespace-pre-wrap break-words font-serif text-[15px] leading-7 text-foreground"
+      className="whitespace-pre-wrap break-words font-serif text-sm leading-6 text-foreground md:text-[15px] md:leading-7"
       data-testid="document-text"
     >
       {mode === 'original'

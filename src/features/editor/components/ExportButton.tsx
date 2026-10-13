@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react';
+import { ChevronDown, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button, type ButtonProps } from '@/components/ui/button';
@@ -22,6 +22,7 @@ interface ExportButtonProps {
   format: string;
   enabled: boolean;
   variant?: ButtonProps['variant'];
+  size?: ButtonProps['size'];
 }
 
 /** Сервер отдаёт только исходный формат, поэтому в меню один пункт (R-5). */
@@ -32,6 +33,7 @@ export function ExportButton({
   format,
   enabled,
   variant = 'outline',
+  size = 'sm',
 }: ExportButtonProps) {
   const exporter = useExportDocument(projectId, documentId);
   const extension = formatLabel(format).toLowerCase();
@@ -42,9 +44,10 @@ export function ExportButton({
         <TooltipTrigger asChild>
           {/* У disabled-кнопки нет событий указателя, подсказку вешаем на обёртку. */}
           <span tabIndex={0} className="inline-flex rounded-md">
-            <Button size="sm" variant={variant} disabled>
+            <Button size={size} variant={variant} disabled>
               <Download aria-hidden />
               Экспорт
+              <ChevronDown aria-hidden className="opacity-60" />
             </Button>
           </span>
         </TooltipTrigger>
@@ -56,9 +59,10 @@ export function ExportButton({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="sm" variant={variant} loading={exporter.isPending}>
+        <Button size={size} variant={variant} loading={exporter.isPending}>
           <Download aria-hidden />
           Экспорт
+          <ChevronDown aria-hidden className="opacity-60" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
