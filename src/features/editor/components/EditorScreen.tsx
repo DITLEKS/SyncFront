@@ -4,6 +4,8 @@ import {
   CheckCircle2,
   Info,
   MoreVertical,
+  PanelRightClose,
+  PanelRightOpen,
   PenLine,
   RefreshCw,
   Save,
@@ -64,6 +66,24 @@ const TABLET_QUERY = '(min-width: 768px)';
 const CARD_WIDTH = 544;
 /** Зазор между блоком правки и карточкой. */
 const CARD_GAP = 8;
+/** Состояние выдвижной панели переживает перезагрузку — как у бокового меню. */
+const PANEL_STORAGE_KEY = 'syncscribe.editor.suggestionsPanel';
+
+function readPanelOpen(): boolean {
+  try {
+    return window.localStorage.getItem(PANEL_STORAGE_KEY) !== 'closed';
+  } catch {
+    return true;
+  }
+}
+
+function writePanelOpen(open: boolean): void {
+  try {
+    window.localStorage.setItem(PANEL_STORAGE_KEY, open ? 'open' : 'closed');
+  } catch {
+    // Хранилище недоступно (приватный режим, квота) — состояние живёт только в сессии.
+  }
+}
 
 interface FloatingBox {
   top: number;
@@ -79,6 +99,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   const [mode, setMode] = useState<ViewMode>(() => initialViewMode(meta.view_mode));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState<boolean>(readPanelOpen);
   const resetReview = useResetReview(projectId, meta.id);
   const resetDecisions = useResetDecisions(projectId, meta.id);
   const desktop = useMediaQuery(DESKTOP_QUERY);
@@ -86,6 +107,10 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   const textRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [floating, setFloating] = useState<FloatingBox | null>(null);
+
+  useEffect(() => {
+    writePanelOpen(panelOpen);
+  }, [panelOpen]);
 
   // Word-документ рисуется из самого файла во всех режимах: в «Оригинале» как есть,
   // в «Правках» и «Чистовике» — с правками поверх рендера docx-preview.
@@ -248,6 +273,10 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     />
   ) : null;
 
+  // Карточка не парит и панель свёрнута — показываем её над текстом, чтобы выбор не пропал.
+  const detailsInPanel = !popover && panelOpen;
+  const detailsAboveText = !popover && !panelOpen;
+
   const plainText = model.content.plain_text ? (
     <DocumentText
       mode={mode}
@@ -360,6 +389,27 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Divider className="hidden sm:block" />
+          {/* Тоггл выдвижной панели; в свёрнутом виде напоминает, сколько правок ждут решения. */}
+          <Button
+            size={tablet ? 'icon' : 'iconSm'}
+            variant="outline"
+            className={cn('relative', panelOpen && 'bg-accent text-accent-foreground')}
+            onClick={() => setPanelOpen((open) => !open)}
+            aria-label={panelOpen ? 'Скрыть предложения ИИ' : 'Показать предложения ИИ'}
+            aria-expanded={panelOpen}
+            aria-controls="suggestions-panel"
+          >
+            {panelOpen ? <PanelRightClose aria-hidden /> : <PanelRightOpen aria-hidden />}
+            {!panelOpen && progress.pending > 0 ? (
+              <span
+                aria-hidden
+                className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground tabular-nums"
+              >
+                {progress.pending}
+              </span>
+            ) : null}
+          </Button>
         </div>
       </header>
 
@@ -389,14 +439,16 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
         </Alert>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <section aria-label="Текст документа" className="min-w-0 space-y-3">
+      {/* flex вместо grid: при свёрнутой панели текст занимает всю ширину, а панель уезжает вправо. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <section aria-label="Текст документа" className="min-w-0 flex-1 space-y-3">
           {mode === 'original' ? (
             <Alert>
               <Info aria-hidden />
               <AlertDescription>{EDITOR_TEXTS.originalNotice}</AlertDescription>
             </Alert>
           ) : null}
+          {detailsAboveText ? details : null}
           <div ref={textRef} className="relative">
             <article className="rounded-lg border bg-card px-5 py-4 shadow-sm sm:px-8 sm:py-6 lg:px-10 lg:py-8">
               {article}
@@ -414,56 +466,70 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
           </div>
         </section>
 
-        <div className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
-          <SuggestionsPanel
-            suggestions={model.suggestions}
-            statusOf={model.statusOf}
-            unsavedIds={unsavedIds}
-            located={projection.located}
-            progress={progress}
-            selectedId={selectedId}
-            onSelect={selectFromPanel}
-            canReview={permissions.can_review}
-            onDecide={decideFromPanel}
-            header={
-              <>
-                {allProcessed ? (
-                  completed ? (
-                    <Alert variant="success">
-                      <CheckCircle2 aria-hidden />
-                      <AlertDescription className="space-y-2">
-                        <p>{EDITOR_TEXTS.completed}</p>
-                        {reanalyze ? <span className="flex">{reanalyze}</span> : null}
-                      </AlertDescription>
-                    </Alert>
+        {/* Выдвижная панель: на lg+ анимируется ширина и прозрачность (как у Sidebar), visibility убирает
+            скрытую панель из порядка табуляции; на узких экранах блок просто скрывается. */}
+        <div
+          id="suggestions-panel"
+          aria-hidden={!panelOpen}
+          className={cn(
+            'shrink-0 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto',
+            'transition-[width,opacity,transform,visibility] duration-300 ease-in-out motion-reduce:transition-none',
+            panelOpen
+              ? 'visible translate-x-0 opacity-100 lg:w-[19rem] lg:pr-1 xl:w-[22rem]'
+              : 'hidden lg:invisible lg:block lg:w-0 lg:translate-x-6 lg:overflow-hidden lg:opacity-0',
+          )}
+        >
+          <div className="lg:w-[calc(19rem-0.25rem)] xl:w-[calc(22rem-0.25rem)]">
+            <SuggestionsPanel
+              suggestions={model.suggestions}
+              statusOf={model.statusOf}
+              unsavedIds={unsavedIds}
+              located={projection.located}
+              progress={progress}
+              selectedId={selectedId}
+              onSelect={selectFromPanel}
+              canReview={permissions.can_review}
+              onDecide={decideFromPanel}
+              header={
+                <>
+                  {allProcessed ? (
+                    completed ? (
+                      <Alert variant="success">
+                        <CheckCircle2 aria-hidden />
+                        <AlertDescription className="space-y-2">
+                          <p>{EDITOR_TEXTS.completed}</p>
+                          {reanalyze ? <span className="flex">{reanalyze}</span> : null}
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <Alert>
+                        <CheckCircle2 aria-hidden />
+                        <AlertDescription className="space-y-2">
+                          <p>{EDITOR_TEXTS.allProcessed}</p>
+                          <span className="flex flex-wrap gap-2">
+                            <SaveButton
+                              canSave={model.canSave}
+                              saving={model.saving}
+                              onSave={() => void save()}
+                            />
+                            {mode !== 'clean' ? (
+                              <Button size="sm" variant="outline" onClick={() => setMode('clean')}>
+                                Просмотреть чистовик
+                              </Button>
+                            ) : null}
+                            {reanalyze}
+                          </span>
+                        </AlertDescription>
+                      </Alert>
+                    )
                   ) : (
-                    <Alert>
-                      <CheckCircle2 aria-hidden />
-                      <AlertDescription className="space-y-2">
-                        <p>{EDITOR_TEXTS.allProcessed}</p>
-                        <span className="flex flex-wrap gap-2">
-                          <SaveButton
-                            canSave={model.canSave}
-                            saving={model.saving}
-                            onSave={() => void save()}
-                          />
-                          {mode !== 'clean' ? (
-                            <Button size="sm" variant="outline" onClick={() => setMode('clean')}>
-                              Просмотреть чистовик
-                            </Button>
-                          ) : null}
-                          {reanalyze}
-                        </span>
-                      </AlertDescription>
-                    </Alert>
-                  )
-                ) : (
-                  reanalyze
-                )}
-                {popover ? null : details}
-              </>
-            }
-          />
+                    reanalyze
+                  )}
+                  {detailsInPanel ? details : null}
+                </>
+              }
+            />
+          </div>
         </div>
       </div>
 
