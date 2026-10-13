@@ -53,8 +53,7 @@ export function LeaveGuard({ dirty, saving, saveError, onSave, onDiscard }: Leav
     <AlertDialog.Root open onOpenChange={(open) => !open && !saving && stay()}>
       <AlertDialog.Portal>
         <AlertDialog.Overlay className="fixed inset-0 z-50 bg-slate-950/40" />
-        {/* Три кнопки в ряд не помещаются в max-w-md — карточка шире, ряд переносится при нехватке места. */}
-        <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border bg-card p-6 shadow-lg">
+        <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border bg-card p-6 shadow-lg">
           <AlertDialog.Title className="text-lg font-semibold">
             Несохранённые изменения
           </AlertDialog.Title>
@@ -67,15 +66,13 @@ export function LeaveGuard({ dirty, saving, saveError, onSave, onDiscard }: Leav
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : null}
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-            <AlertDialog.Cancel asChild>
-              <Button variant="outline" disabled={saving}>
-                Остаться
-              </Button>
-            </AlertDialog.Cancel>
+          {/* Обычная раскладка диалога: деструктивное действие тихой кнопкой слева, пара «отмена / основное»
+              справа — все три в одну линию. На узком экране — колонка, основное действие сверху. */}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
             <Button
-              variant="outline"
+              variant="ghost"
               disabled={saving}
+              className="whitespace-nowrap text-muted-foreground hover:text-destructive"
               onClick={() => {
                 onDiscard();
                 blocker.proceed();
@@ -83,9 +80,20 @@ export function LeaveGuard({ dirty, saving, saveError, onSave, onDiscard }: Leav
             >
               Выйти без сохранения
             </Button>
-            <Button loading={saving} onClick={() => void saveAndLeave()}>
-              Сохранить и выйти
-            </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <AlertDialog.Cancel asChild>
+                <Button variant="outline" disabled={saving} className="whitespace-nowrap">
+                  Остаться
+                </Button>
+              </AlertDialog.Cancel>
+              <Button
+                loading={saving}
+                className="whitespace-nowrap"
+                onClick={() => void saveAndLeave()}
+              >
+                Сохранить и выйти
+              </Button>
+            </div>
           </div>
         </AlertDialog.Content>
       </AlertDialog.Portal>
