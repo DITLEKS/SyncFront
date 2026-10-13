@@ -1,5 +1,14 @@
 import { observeElementRect, useVirtualizer } from '@tanstack/react-virtual';
-import { Check, CheckCircle2, FileText, Inbox, ListChecks, TriangleAlert, X } from 'lucide-react';
+import {
+  Check,
+  CheckCircle2,
+  FileText,
+  Inbox,
+  ListChecks,
+  TriangleAlert,
+  Undo2,
+  X,
+} from 'lucide-react';
 import { memo, useEffect, useRef, useState } from 'react';
 
 import type { SuggestionResponse } from '@/api/types';
@@ -36,6 +45,8 @@ interface SuggestionsPanelProps {
   canReview?: boolean;
   /** Быстрое решение по выбранной правке без открытия карточки. */
   onDecide?: (id: string, decision: PanelDecision) => void;
+  /** Отмена решения по рассмотренной правке — как у блоков в тексте. */
+  onUndo?: (id: string) => void;
   /** Карточка выбранной правки и блок завершения — над списком. */
   header?: React.ReactNode;
 }
@@ -54,6 +65,7 @@ export function SuggestionsPanel({
   onSelect,
   canReview = false,
   onDecide,
+  onUndo,
   header,
 }: SuggestionsPanelProps) {
   const [filter, setFilter] = useState<SuggestionFilter>('pending');
@@ -75,6 +87,7 @@ export function SuggestionsPanel({
       canReview={canReview}
       onSelect={onSelect}
       onDecide={onDecide}
+      onUndo={onUndo}
     />
   );
 
@@ -190,12 +203,13 @@ interface SuggestionCardProps {
   canReview: boolean;
   onSelect: (id: string) => void;
   onDecide?: (id: string, decision: PanelDecision) => void;
+  onUndo?: (id: string) => void;
 }
 
 /**
  * Элемент списка по макету: обычные правки — плоские строки без рамки, выбранная — карточка
- * с кнопками «Принять / Отклонить». Обёртка — div, чтобы кнопки действий не оказались
- * внутри кнопки выбора.
+ * с кнопками «Принять / Отклонить»; у решённых при наведении поверх статуса появляется
+ * «Отменить». Обёртка — div, чтобы кнопки действий не оказались внутри кнопки выбора.
  */
 const SuggestionCard = memo(function SuggestionCard({
   suggestion: s,
@@ -206,12 +220,14 @@ const SuggestionCard = memo(function SuggestionCard({
   canReview,
   onSelect,
   onDecide,
+  onUndo,
 }: SuggestionCardProps) {
   const showActions = selected && status === 'pending' && canReview && Boolean(onDecide);
+  const showUndo = status !== 'pending' && Boolean(onUndo);
   return (
     <div
       className={cn(
-        'rounded-xl p-3 text-sm transition-colors',
+        'group relative rounded-xl p-3 text-sm transition-colors',
         selected ? 'border bg-card shadow-sm' : 'border border-transparent hover:bg-accent/50',
       )}
     >
@@ -229,12 +245,13 @@ const SuggestionCard = memo(function SuggestionCard({
               aria-label={ISSUE_TEXTS[issue]}
             />
           ) : null}
-          {/* Статус решения — у правого края строки, как на макете («✕ Отклонено»). */}
+          {/* Статус решения — у правого края; при наведении его место занимает «Отменить». */}
           {status !== 'pending' ? (
             <span
               className={cn(
-                'ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-medium',
+                'ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-medium transition-opacity',
                 status === 'accepted' ? 'text-emerald-700' : 'text-muted-foreground',
+                showUndo && 'group-hover:opacity-0 group-focus-within:opacity-0',
               )}
             >
               {status === 'accepted' ? (
@@ -255,6 +272,17 @@ const SuggestionCard = memo(function SuggestionCard({
           </span>
         ) : null}
       </button>
+
+      {showUndo ? (
+        <button
+          type="button"
+          onClick={() => onUndo?.(s.id)}
+          className="absolute right-3 top-2.5 inline-flex h-6 items-center gap-1 rounded-md border bg-card px-2 text-xs font-medium text-foreground opacity-0 shadow-sm transition-opacity hover:bg-accent focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100 motion-reduce:transition-none"
+        >
+          <Undo2 className="size-3" aria-hidden />
+          Отменить
+        </button>
+      ) : null}
 
       {showActions ? (
         <div className="mt-3 grid grid-cols-2 gap-2">

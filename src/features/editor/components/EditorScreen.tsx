@@ -104,15 +104,31 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   const resetDecisions = useResetDecisions(projectId, meta.id);
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const tablet = useMediaQuery(TABLET_QUERY);
+  const headerRef = useRef<HTMLElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [floating, setFloating] = useState<FloatingBox | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   useEffect(() => {
     writePanelOpen(panelOpen);
   }, [panelOpen]);
 
   const togglePanel = useCallback(() => setPanelOpen((open) => !open), []);
+
+  // Шторка липнет ровно к низу sticky-шапки. Её высота зависит от ширины окна (перенос группы
+  // действий на вторую строку), поэтому измеряется, а не зашита в классах: фиксированный top
+  // оставлял при прокрутке зазор между шапкой и панелью и выталкивал низ панели за экран.
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!header) return undefined;
+    const update = () => setHeaderHeight(header.offsetHeight);
+    update();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
 
   // Word-документ рисуется из самого файла во всех режимах: в «Оригинале» как есть,
   // в «Правках» и «Чистовике» — с правками поверх рендера docx-preview.
@@ -148,8 +164,8 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     [decideSuggestion],
   );
 
-  // Отмена решения: из карточки и кнопкой на блоке в тексте. Несохранённое снимается локально,
-  // сохранённое — запросом на бэкенд.
+  // Отмена решения: из карточки, кнопкой на блоке в тексте и при наведении в панели.
+  // Несохранённое снимается локально, сохранённое — запросом на бэкенд.
   const undo = useCallback(
     (id: string) => {
       if (decisions[id]) {
@@ -320,12 +336,20 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   );
 
   const panelToggleLabel = panelOpen ? 'Скрыть предложения ИИ' : 'Показать предложения ИИ';
+  // На десктопе шторка занимает всё место от низа шапки до низа окна; ниже lg — обычный поток.
+  const drawerStyle =
+    desktop && headerHeight > 0
+      ? { top: headerHeight, height: `calc(100vh - ${headerHeight}px)` }
+      : undefined;
 
   return (
     <div className="flex flex-col gap-4">
       {/* Шапка по макету: название держит минимальную ширину, группа действий при нехватке места
           переносится на вторую строку целиком, а не сжимает название и статус. */}
-      <header className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background/95 px-4 py-2 backdrop-blur-sm md:-mx-8 md:px-8">
+      <header
+        ref={headerRef}
+        className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background/95 px-4 py-2 backdrop-blur-sm md:-mx-8 md:px-8"
+      >
         <Button size="icon" variant="ghost" onClick={goBack} aria-label="Назад">
           <ArrowLeft aria-hidden />
         </Button>
@@ -471,14 +495,16 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
         </section>
 
         {/* Выдвижная «шторка» по макету: на lg+ прижата к правому краю окна и к низу шапки
-            (отрицательные отступы гасят поля страницы), с левой границей и собственным скроллом.
-            Анимируются ширина и прозрачность (как у Sidebar); visibility убирает скрытую панель
-            из порядка табуляции. На узких экранах — обычный блок под текстом, который просто скрывается. */}
+            (отрицательные отступы гасят поля страницы), с левой границей и собственным скроллом,
+            который появляется только когда список не помещается. top/height считаются от измеренной
+            шапки. Анимируются ширина и прозрачность (как у Sidebar); visibility убирает скрытую
+            панель из порядка табуляции. На узких экранах — обычный блок под текстом, который просто скрывается. */}
         <div
           id="suggestions-panel"
           aria-hidden={!panelOpen}
+          style={drawerStyle}
           className={cn(
-            'relative shrink-0 lg:sticky lg:top-24 lg:-mr-8 lg:-mt-4 lg:h-[calc(100vh-6rem)] lg:self-start',
+            'relative shrink-0 lg:sticky lg:-mr-8 lg:-mt-4 lg:self-start',
             'transition-[width,opacity,transform,visibility] duration-300 ease-in-out motion-reduce:transition-none',
             panelOpen
               ? 'visible translate-x-0 opacity-100 lg:w-[20rem] lg:border-l lg:bg-card xl:w-[23rem]'
@@ -495,7 +521,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
             tabIndex={panelOpen ? 0 : -1}
             className="absolute left-1 top-4 z-10 hidden h-64 w-1.5 rounded-full bg-border transition-colors hover:bg-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:block"
           />
-          <div className="lg:h-full lg:w-[20rem] lg:overflow-y-auto lg:px-7 lg:py-6 xl:w-[23rem]">
+          <div className="lg:h-full lg:w-[20rem] lg:overflow-y-auto lg:overscroll-contain lg:px-7 lg:py-6 xl:w-[23rem]">
             <SuggestionsPanel
               suggestions={model.suggestions}
               statusOf={model.statusOf}
@@ -506,6 +532,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
               onSelect={selectFromPanel}
               canReview={permissions.can_review}
               onDecide={decideFromPanel}
+              onUndo={undo}
               header={
                 <>
                   {allProcessed ? (
