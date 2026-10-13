@@ -1,15 +1,18 @@
 import { create } from 'zustand';
 
-import type { DecisionBuffer } from '@/domain/editor/review';
+import type { DecisionBuffer, EditBuffer } from '@/domain/editor/review';
 import type { Decision } from '@/domain/editor/suggestion';
 
 interface ReviewBufferStore {
   /** Документ и анализ, к которым относятся решения: `${documentId}:${jobId}`. */
   scope: string | null;
   decisions: DecisionBuffer;
+  /** Отредактированный новый текст принятых правок; живёт и сбрасывается вместе с решением. */
+  edits: EditBuffer;
   /** Привязать буфер к анализу; решения другого документа или анализа отбрасываются. */
   bind: (scope: string) => void;
-  decide: (id: string, decision: Decision) => void;
+  /** editedText — текст правки, изменённый пользователем перед принятием; без него старая правка стирается. */
+  decide: (id: string, decision: Decision, editedText?: string) => void;
   undo: (id: string) => void;
   forget: (ids: readonly string[]) => void;
   clear: () => void;
@@ -22,17 +25,34 @@ interface ReviewBufferStore {
 export const useReviewBuffer = create<ReviewBufferStore>((set) => ({
   scope: null,
   decisions: {},
-  bind: (scope) => set((state) => (state.scope === scope ? state : { scope, decisions: {} })),
-  decide: (id, decision) => set((state) => ({ decisions: { ...state.decisions, [id]: decision } })),
-  undo: (id) => set((state) => ({ decisions: without(state.decisions, [id]) })),
-  forget: (ids) => set((state) => ({ decisions: without(state.decisions, ids) })),
-  clear: () => set({ decisions: {} }),
+  edits: {},
+  bind: (scope) =>
+    set((state) => (state.scope === scope ? state : { scope, decisions: {}, edits: {} })),
+  decide: (id, decision, editedText) =>
+    set((state) => ({
+      decisions: { ...state.decisions, [id]: decision },
+      edits: editedText ? { ...state.edits, [id]: editedText } : without(state.edits, [id]),
+    })),
+  undo: (id) =>
+    set((state) => ({
+      decisions: without(state.decisions, [id]),
+      edits: without(state.edits, [id]),
+    })),
+  forget: (ids) =>
+    set((state) => ({
+      decisions: without(state.decisions, ids),
+      edits: without(state.edits, ids),
+    })),
+  clear: () => set({ decisions: {}, edits: {} }),
 }));
 
 export const reviewScope = (documentId: string, jobId: string | null | undefined) =>
   `${documentId}:${jobId ?? 'none'}`;
 
-function without(decisions: DecisionBuffer, ids: readonly string[]): DecisionBuffer {
+function without<T>(
+  map: Readonly<Record<string, T>>,
+  ids: readonly string[],
+): Readonly<Record<string, T>> {
   const drop = new Set(ids);
-  return Object.fromEntries(Object.entries(decisions).filter(([id]) => !drop.has(id)));
+  return Object.fromEntries(Object.entries(map).filter(([id]) => !drop.has(id)));
 }

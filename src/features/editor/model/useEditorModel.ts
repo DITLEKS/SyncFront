@@ -5,11 +5,17 @@ import { isDocumentStatus, type DocumentStatus } from '@/domain/document/status'
 import { buildProjection, type Projection } from '@/domain/editor/projection';
 import {
   type DecisionBuffer,
+  type EditBuffer,
   effectiveStatus,
   planSave,
   reviewProgress,
 } from '@/domain/editor/review';
-import type { Decision, SuggestionStatus } from '@/domain/editor/suggestion';
+import {
+  effectiveNewText,
+  type Decision,
+  type EditorSuggestion,
+  type SuggestionStatus,
+} from '@/domain/editor/suggestion';
 import { getErrorMessage } from '@/lib/errors';
 
 import { isReviewConflict, useSaveReview } from '../hooks/useEditor';
@@ -26,6 +32,7 @@ export function initialViewMode(viewMode: string): ViewMode {
 }
 
 const NO_DECISIONS: DecisionBuffer = {};
+const NO_EDITS: EditBuffer = {};
 
 export type SaveOutcome = 'saved' | 'conflict' | 'failed';
 
@@ -46,17 +53,20 @@ export function useEditorModel(
   const bind = useReviewBuffer((s) => s.bind);
   const boundScope = useReviewBuffer((s) => s.scope);
   const storedDecisions = useReviewBuffer((s) => s.decisions);
+  const storedEdits = useReviewBuffer((s) => s.edits);
   const decide = useReviewBuffer((s) => s.decide);
   const undo = useReviewBuffer((s) => s.undo);
   const forget = useReviewBuffer((s) => s.forget);
   const clear = useReviewBuffer((s) => s.clear);
   useEffect(() => bind(scope), [bind, scope]);
   // До bind() в буфере могут лежать решения другого документа: не показываем их ни на один кадр.
-  const decisions = boundScope === scope ? storedDecisions : NO_DECISIONS;
+  const bound = boundScope === scope;
+  const decisions = bound ? storedDecisions : NO_DECISIONS;
+  const edits = bound ? storedEdits : NO_EDITS;
 
   const plan = useMemo(
-    () => planSave(suggestions, decisions, counters.pending),
-    [suggestions, decisions, counters.pending],
+    () => planSave(suggestions, decisions, counters.pending, edits),
+    [suggestions, decisions, counters.pending, edits],
   );
   // Правка решена в другой сессии или исчезла с новым анализом: решение из буфера уже не применить.
   useEffect(() => {
@@ -69,6 +79,12 @@ export function useEditorModel(
     [decisions],
   );
 
+  // Новый текст правки с учётом несохранённой и сохранённой правки пользователя.
+  const newTextOf = useCallback(
+    (s: EditorSuggestion): string => effectiveNewText(s, edits[s.id]),
+    [edits],
+  );
+
   const projections = useMemo<Record<'suggestions' | 'clean', Projection>>(() => {
     const base = {
       text: content.plain_text,
@@ -76,12 +92,13 @@ export function useEditorModel(
       format: meta.format,
       suggestions,
       statusOf,
+      newTextOf,
     };
     return {
       suggestions: buildProjection({ ...base, addPlacement: 'section' }),
       clean: buildProjection({ ...base, addPlacement: 'end' }),
     };
-  }, [content.plain_text, content.sections, meta.format, suggestions, statusOf]);
+  }, [content.plain_text, content.sections, meta.format, suggestions, statusOf, newTextOf]);
 
   const progress = useMemo(
     () => reviewProgress(counters, suggestions, decisions),
@@ -120,8 +137,8 @@ export function useEditorModel(
   }, [save, meta.review_version, plan, clear, refetch]);
 
   const decideSuggestion = useCallback(
-    (id: string, decision: Decision) => {
-      if (permissions.can_review) decide(id, decision);
+    (id: string, decision: Decision, editedText?: string) => {
+      if (permissions.can_review) decide(id, decision, editedText);
     },
     [decide, permissions.can_review],
   );
@@ -136,6 +153,7 @@ export function useEditorModel(
     projections,
     progress,
     statusOf,
+    newTextOf,
     decisions,
     unsavedCount,
     canSave,

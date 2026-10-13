@@ -50,7 +50,7 @@ export function applyReviewResult(
   body: ReviewSaveRequest,
   result: ReviewSaveResponse,
 ): EditorAggregateResponse {
-  const decided = new Map((body.decisions ?? []).map((d) => [d.suggestion_id, d.decision]));
+  const decided = new Map((body.decisions ?? []).map((d) => [d.suggestion_id, d]));
   return {
     ...editor,
     document: {
@@ -62,7 +62,9 @@ export function applyReviewResult(
     },
     suggestions: editor.suggestions.map((s) => {
       const decision = decided.get(s.id);
-      return decision ? { ...s, status: decision } : s;
+      if (!decision) return s;
+      // Сервер сохраняет edited_text вместе с решением — отражаем это в кеше до перезапроса.
+      return { ...s, status: decision.decision, edited_text: decision.edited_text ?? null };
     }),
     counters: {
       ...editor.counters,
