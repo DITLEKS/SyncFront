@@ -4,6 +4,8 @@ import {
   CheckCircle2,
   Info,
   MoreVertical,
+  PanelRightClose,
+  PanelRightOpen,
   PenLine,
   RefreshCw,
   Save,
@@ -36,11 +38,12 @@ import { EDITOR_TEXTS } from '../model/texts';
 import { initialViewMode, useEditorModel, type ViewMode } from '../model/useEditorModel';
 
 import { DocumentText } from './DocumentText';
+import { DocxSuggestionsView } from './DocxSuggestionsView';
 import { ExportButton } from './ExportButton';
 import { LeaveGuard } from './LeaveGuard';
 import { OriginalDocxView } from './OriginalDocxView';
 import { SuggestionDetails } from './SuggestionDetails';
-import { SuggestionsPanel } from './SuggestionsPanel';
+import { SuggestionsPanel, type PanelDecision } from './SuggestionsPanel';
 
 interface EditorScreenProps {
   projectId: string;
@@ -63,6 +66,24 @@ const TABLET_QUERY = '(min-width: 768px)';
 const CARD_WIDTH = 544;
 /** Зазор между блоком правки и карточкой. */
 const CARD_GAP = 8;
+/** Состояние выдвижной панели переживает перезагрузку — как у бокового меню. */
+const PANEL_STORAGE_KEY = 'syncscribe.editor.suggestionsPanel';
+
+function readPanelOpen(): boolean {
+  try {
+    return window.localStorage.getItem(PANEL_STORAGE_KEY) !== 'closed';
+  } catch {
+    return true;
+  }
+}
+
+function writePanelOpen(open: boolean): void {
+  try {
+    window.localStorage.setItem(PANEL_STORAGE_KEY, open ? 'open' : 'closed');
+  } catch {
+    // Хранилище недоступно (приватный режим, квота) — состояние живёт только в сессии.
+  }
+}
 
 interface FloatingBox {
   top: number;
@@ -72,23 +93,47 @@ interface FloatingBox {
 
 export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) {
   const model = useEditorModel(projectId, editor, refetch);
-  const { meta, status, permissions, progress, decisions, undoBuffered } = model;
+  const { meta, status, permissions, progress, decisions, undoBuffered, decideSuggestion } = model;
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<ViewMode>(() => initialViewMode(meta.view_mode));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState<boolean>(readPanelOpen);
   const resetReview = useResetReview(projectId, meta.id);
   const resetDecisions = useResetDecisions(projectId, meta.id);
   const desktop = useMediaQuery(DESKTOP_QUERY);
   const tablet = useMediaQuery(TABLET_QUERY);
+  const headerRef = useRef<HTMLElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [floating, setFloating] = useState<FloatingBox | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
 
-  // «Оригинал» для Word — сам файл, отрисованный в браузере; файл запрашивается только в этом режиме.
-  const showDocx = mode === 'original' && meta.format === 'docx';
-  const file = useDocumentFile(projectId, meta.id, showDocx);
+  useEffect(() => {
+    writePanelOpen(panelOpen);
+  }, [panelOpen]);
+
+  const togglePanel = useCallback(() => setPanelOpen((open) => !open), []);
+
+  // Шторка липнет ровно к низу sticky-шапки. Её высота зависит от ширины окна (перенос группы
+  // действий на вторую строку), поэтому измеряется, а не зашита в классах: фиксированный top
+  // оставлял при прокрутке зазор между шапкой и панелью и выталкивал низ панели за экран.
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!header) return undefined;
+    const update = () => setHeaderHeight(header.offsetHeight);
+    update();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+
+  // Word-документ рисуется из самого файла во всех режимах: в «Оригинале» как есть,
+  // в «Правках» и «Чистовике» — с правками поверх рендера docx-preview.
+  const isDocx = meta.format === 'docx';
+  const file = useDocumentFile(projectId, meta.id, isDocx);
 
   const headerSize: ButtonProps['size'] = tablet ? 'default' : 'sm';
   const projection = mode === 'clean' ? model.projections.clean : model.projections.suggestions;
@@ -110,8 +155,17 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     });
   }, []);
 
-  // Отмена решения: из карточки и кнопкой на блоке в тексте. Несохранённое снимается локально,
-  // сохранённое — запросом на бэкенд.
+  // Быстрое решение кнопками в списке панели: то же, что из карточки, без правки текста.
+  const decideFromPanel = useCallback(
+    (id: string, decision: PanelDecision) => {
+      decideSuggestion(id, decision);
+      setSelectedId(null);
+    },
+    [decideSuggestion],
+  );
+
+  // Отмена решения: из карточки, кнопкой на блоке в тексте и при наведении в панели.
+  // Несохранённое снимается локально, сохранённое — запросом на бэкенд.
   const undo = useCallback(
     (id: string) => {
       if (decisions[id]) {
@@ -199,7 +253,6 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     return outcome;
   };
 
-  const allProcessed = progress.total > 0 && progress.pending === 0;
   const completed = status === 'ready' && model.unsavedCount === 0;
   const liveStatus = liveStatusText({
     saving: model.saving,
@@ -224,17 +277,22 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
       suggestion={selected}
       status={model.statusOf(selected)}
       unsaved={unsavedIds.has(selected.id)}
+      newText={model.newTextOf(selected)}
       located={projection.located[selected.id]}
       canReview={permissions.can_review}
       undoing={resetDecisions.isPending}
-      onDecide={(decision) => {
-        model.decideSuggestion(selected.id, decision);
+      onDecide={(decision, editedText) => {
+        model.decideSuggestion(selected.id, decision, editedText);
         setSelectedId(null);
       }}
       onUndo={() => undo(selected.id)}
       onClose={() => setSelectedId(null)}
     />
   ) : null;
+
+  // Карточка не парит и панель свёрнута — показываем её над текстом, чтобы выбор не пропал.
+  const detailsInPanel = !popover && panelOpen;
+  const detailsAboveText = !popover && !panelOpen;
 
   const plainText = model.content.plain_text ? (
     <DocumentText
@@ -249,11 +307,48 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     <p className="text-sm text-muted-foreground">Документ не содержит текста.</p>
   );
 
+  // Word: «Оригинал» — чистый рендер файла; «Правки»/«Чистовик» — тот же рендер с якорями правок.
+  const article = !isDocx ? (
+    plainText
+  ) : mode === 'original' ? (
+    <OriginalDocxView
+      file={file.data}
+      loading={file.isLoading}
+      error={file.error}
+      fallback={plainText}
+    />
+  ) : (
+    <DocxSuggestionsView
+      file={file.data}
+      loading={file.isLoading}
+      error={file.error}
+      mode={mode}
+      suggestions={model.suggestions}
+      sections={model.content.sections}
+      plainText={model.content.plain_text}
+      statusOf={model.statusOf}
+      newTextOf={model.newTextOf}
+      selectedId={selectedId}
+      onSelect={setSelectedId}
+      fallback={plainText}
+    />
+  );
+
+  const panelToggleLabel = panelOpen ? 'Скрыть предложения ИИ' : 'Показать предложения ИИ';
+  // На десктопе шторка занимает всё место от низа шапки до низа окна; ниже lg — обычный поток.
+  const drawerStyle =
+    desktop && headerHeight > 0
+      ? { top: headerHeight, height: `calc(100vh - ${headerHeight}px)` }
+      : undefined;
+
   return (
     <div className="flex flex-col gap-4">
       {/* Шапка по макету: название держит минимальную ширину, группа действий при нехватке места
           переносится на вторую строку целиком, а не сжимает название и статус. */}
-      <header className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background/95 px-4 py-2 backdrop-blur-sm md:-mx-8 md:px-8">
+      <header
+        ref={headerRef}
+        className="sticky top-0 z-10 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background/95 px-4 py-2 backdrop-blur-sm md:-mx-8 md:px-8"
+      >
         <Button size="icon" variant="ghost" onClick={goBack} aria-label="Назад">
           <ArrowLeft aria-hidden />
         </Button>
@@ -321,6 +416,27 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Divider className="hidden sm:block" />
+          {/* Тоггл выдвижной панели; в свёрнутом виде напоминает, сколько правок ждут решения. */}
+          <Button
+            size={tablet ? 'icon' : 'iconSm'}
+            variant="outline"
+            className={cn('relative', panelOpen && 'bg-accent text-accent-foreground')}
+            onClick={togglePanel}
+            aria-label={panelToggleLabel}
+            aria-expanded={panelOpen}
+            aria-controls="suggestions-panel"
+          >
+            {panelOpen ? <PanelRightClose aria-hidden /> : <PanelRightOpen aria-hidden />}
+            {!panelOpen && progress.pending > 0 ? (
+              <span
+                aria-hidden
+                className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-primary px-1 text-[10px] font-semibold tabular-nums leading-4 text-primary-foreground"
+              >
+                {progress.pending}
+              </span>
+            ) : null}
+          </Button>
         </div>
       </header>
 
@@ -350,26 +466,19 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
         </Alert>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <section aria-label="Текст документа" className="min-w-0 space-y-3">
+      {/* flex вместо grid: при свёрнутой панели текст занимает всю ширину, а панель уезжает вправо. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+        <section aria-label="Текст документа" className="min-w-0 flex-1 space-y-3">
           {mode === 'original' ? (
             <Alert>
               <Info aria-hidden />
               <AlertDescription>{EDITOR_TEXTS.originalNotice}</AlertDescription>
             </Alert>
           ) : null}
+          {detailsAboveText ? details : null}
           <div ref={textRef} className="relative">
             <article className="rounded-lg border bg-card px-5 py-4 shadow-sm sm:px-8 sm:py-6 lg:px-10 lg:py-8">
-              {showDocx ? (
-                <OriginalDocxView
-                  file={file.data}
-                  loading={file.isLoading}
-                  error={file.error}
-                  fallback={plainText}
-                />
-              ) : (
-                plainText
-              )}
+              {article}
             </article>
             {popover ? (
               // z-[5] — ниже sticky-шапки (z-10): при прокрутке карточка уходит под неё.
@@ -384,19 +493,48 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
           </div>
         </section>
 
-        <div className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
-          <SuggestionsPanel
-            suggestions={model.suggestions}
-            statusOf={model.statusOf}
-            unsavedIds={unsavedIds}
-            located={projection.located}
-            progress={progress}
-            selectedId={selectedId}
-            onSelect={selectFromPanel}
-            header={
-              <>
-                {allProcessed ? (
-                  completed ? (
+        {/* Выдвижная «шторка» по макету: на lg+ прижата к правому краю окна и к низу шапки
+            (отрицательные отступы гасят поля страницы), с левой границей и собственным скроллом,
+            который появляется только когда список не помещается. top/height считаются от измеренной
+            шапки. Анимируются ширина и прозрачность (как у Sidebar); visibility убирает скрытую
+            панель из порядка табуляции. На узких экранах — обычный блок под текстом, который просто скрывается. */}
+        <div
+          id="suggestions-panel"
+          aria-hidden={!panelOpen}
+          style={drawerStyle}
+          className={cn(
+            'relative shrink-0 lg:sticky lg:-mr-8 lg:-mt-4 lg:self-start',
+            'transition-[width,opacity,transform,visibility] duration-300 ease-in-out motion-reduce:transition-none',
+            panelOpen
+              ? 'visible translate-x-0 opacity-100 lg:w-[20rem] lg:border-l lg:bg-card xl:w-[23rem]'
+              : 'hidden lg:invisible lg:block lg:w-0 lg:translate-x-6 lg:overflow-hidden lg:opacity-0',
+          )}
+        >
+          {/* Хэндл на левой кромке — второй способ свернуть панель, как на макете. */}
+          <button
+            type="button"
+            onClick={togglePanel}
+            aria-label={panelToggleLabel}
+            aria-expanded={panelOpen}
+            aria-controls="suggestions-panel"
+            tabIndex={panelOpen ? 0 : -1}
+            className="absolute left-1 top-4 z-10 hidden h-64 w-1.5 rounded-full bg-border transition-colors hover:bg-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:block"
+          />
+          <div className="lg:h-full lg:w-[20rem] lg:overflow-y-auto lg:overscroll-contain lg:px-7 lg:py-6 xl:w-[23rem]">
+            <SuggestionsPanel
+              suggestions={model.suggestions}
+              statusOf={model.statusOf}
+              unsavedIds={unsavedIds}
+              located={projection.located}
+              progress={progress}
+              selectedId={selectedId}
+              onSelect={selectFromPanel}
+              canReview={permissions.can_review}
+              onDecide={decideFromPanel}
+              onUndo={undo}
+              header={
+                <>
+                  {completed ? (
                     <Alert variant="success">
                       <CheckCircle2 aria-hidden />
                       <AlertDescription className="space-y-2">
@@ -405,33 +543,13 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
                       </AlertDescription>
                     </Alert>
                   ) : (
-                    <Alert>
-                      <CheckCircle2 aria-hidden />
-                      <AlertDescription className="space-y-2">
-                        <p>{EDITOR_TEXTS.allProcessed}</p>
-                        <span className="flex flex-wrap gap-2">
-                          <SaveButton
-                            canSave={model.canSave}
-                            saving={model.saving}
-                            onSave={() => void save()}
-                          />
-                          {mode !== 'clean' ? (
-                            <Button size="sm" variant="outline" onClick={() => setMode('clean')}>
-                              Просмотреть чистовик
-                            </Button>
-                          ) : null}
-                          {reanalyze}
-                        </span>
-                      </AlertDescription>
-                    </Alert>
-                  )
-                ) : (
-                  reanalyze
-                )}
-                {popover ? null : details}
-              </>
-            }
-          />
+                    reanalyze
+                  )}
+                  {detailsInPanel ? details : null}
+                </>
+              }
+            />
+          </div>
         </div>
       </div>
 

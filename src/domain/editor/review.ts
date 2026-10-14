@@ -5,6 +5,8 @@
 import type { Decision, EditorSuggestion, SuggestionStatus } from './suggestion';
 
 export type DecisionBuffer = Readonly<Record<string, Decision>>;
+/** Отредактированный пользователем новый текст правки, по id; имеет смысл только вместе с accepted. */
+export type EditBuffer = Readonly<Record<string, string>>;
 
 export function effectiveStatus(
   suggestion: Pick<EditorSuggestion, 'id' | 'status'>,
@@ -15,7 +17,7 @@ export function effectiveStatus(
 }
 
 export interface SavePlan {
-  decisions: { suggestion_id: string; decision: Decision }[];
+  decisions: { suggestion_id: string; decision: Decision; edited_text?: string }[];
   /** true только если после сохранения не останется pending: иначе сервер ответит 409. */
   finalize: boolean;
   /** Решения из буфера, которые уже не относятся к pending-правкам на сервере. */
@@ -24,7 +26,8 @@ export interface SavePlan {
 
 /**
  * План сохранения. Сервер принимает решения только по pending-правкам текущего анализа;
- * уже решённые на сервере правки из буфера отбрасываются.
+ * уже решённые на сервере правки из буфера отбрасываются. edited_text уходит только
+ * с accepted — для rejected сервер его не принимает (422).
  *
  * @param serverPendingCount полный счётчик pending с сервера (правок может быть больше, чем загружено).
  */
@@ -32,13 +35,22 @@ export function planSave(
   suggestions: readonly Pick<EditorSuggestion, 'id' | 'status'>[],
   buffer: DecisionBuffer,
   serverPendingCount: number,
+  edits: EditBuffer = {},
 ): SavePlan {
   const pendingIds = new Set(suggestions.filter((s) => s.status === 'pending').map((s) => s.id));
   const decisions: SavePlan['decisions'] = [];
   const stale: string[] = [];
   for (const [id, decision] of Object.entries(buffer)) {
-    if (pendingIds.has(id)) decisions.push({ suggestion_id: id, decision });
-    else stale.push(id);
+    if (!pendingIds.has(id)) {
+      stale.push(id);
+      continue;
+    }
+    const edited = decision === 'accepted' ? edits[id] : undefined;
+    decisions.push(
+      edited
+        ? { suggestion_id: id, decision, edited_text: edited }
+        : { suggestion_id: id, decision },
+    );
   }
   return { decisions, finalize: serverPendingCount - decisions.length === 0, stale };
 }

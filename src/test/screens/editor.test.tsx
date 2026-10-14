@@ -153,7 +153,9 @@ describe('Редактор правок', () => {
     expect(within(card).getByText(EDITOR_TEXTS.deleteMessage)).toBeInTheDocument();
     await user.click(within(card).getByRole('button', { name: 'Отклонить' }));
 
-    expect(screen.getByText(EDITOR_TEXTS.allProcessed)).toBeInTheDocument();
+    // Баннера «Все предложения обработаны» больше нет: признак завершения — пустой фильтр «На рассмотрении».
+    expect(await screen.findByText(EMPTY_FILTER_TEXTS.pending)).toBeInTheDocument();
+    expect(screen.getByText(/^0 на рассмотрении$/)).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: /^Сохранить$/ })[0]!);
 
     expect(await screen.findByText(EDITOR_TEXTS.completed)).toBeInTheDocument();

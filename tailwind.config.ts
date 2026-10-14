@@ -10,8 +10,10 @@ export default {
     container: { center: true, padding: '1.5rem', screens: { '2xl': '1400px' } },
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
+        // Базовая прозрачность рамок живёт в --border-alpha; модификатор /xx её масштабирует
+        // (border-border/70 = 70 % от дизайнерских 7 %), а не ломает цвет. Без модификатора <alpha-value> = 1.
+        border: 'hsl(var(--border) / calc(var(--border-alpha) * <alpha-value>))',
+        input: 'hsl(var(--input) / calc(var(--input-alpha) * <alpha-value>))',
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',

@@ -24,6 +24,10 @@ interface ProjectCardProps {
  * Вся карточка — ссылка на проект; меню лежит поверх ссылки отдельным элементом,
  * поэтому клик по нему не открывает проект. Меню видно при наведении и при фокусе с клавиатуры.
  * Декоративные слои (полоска цвета и градиент) лежат в конце разметки и не участвуют в hit-testing.
+ *
+ * Цвет рамок — только `border-border` без модификатора прозрачности: токен --border уже содержит
+ * альфу, и `border-border/80` даёт невалидный hsl(), который браузер заменяет на currentColor (чёрная рамка).
+ * Кольцо фокуса — только при клавиатурном фокусе ссылки.
  */
 export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
   const documents = project.document_count;
@@ -31,12 +35,12 @@ export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
   const color = projectColor(project);
 
   return (
-    <article className="group relative isolate flex min-h-64 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-200 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:-translate-y-0.5 hover:border-border hover:shadow-md motion-reduce:hover:translate-y-0">
+    <article className="group relative isolate flex min-h-64 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       <div className="flex flex-1 flex-col px-5 pb-5 pt-6">
         <div className="flex items-start gap-4 pr-8">
           <ProjectIcon
             project={project}
-            className="size-12 rounded-xl bg-card shadow-[0_4px_14px_hsl(var(--foreground)/0.06)] ring-1 ring-border/50"
+            className="size-12 rounded-xl bg-card shadow-[0_4px_14px_hsl(var(--foreground)/0.06)] ring-1 ring-border"
           />
           <div className="min-w-0 flex-1 pt-0.5">
             <h3 className="truncate text-base font-semibold leading-6" title={project.name}>
@@ -58,7 +62,7 @@ export function ProjectCard({ project, onRename, onDelete }: ProjectCardProps) {
         </p>
       </div>
 
-      <dl className="flex min-h-14 items-center gap-5 border-t border-border/70 bg-card/90 px-5 py-3 text-xs text-muted-foreground">
+      <dl className="flex min-h-14 items-center gap-5 border-t border-border bg-card/90 px-5 py-3 text-xs text-muted-foreground">
         <div className="flex min-w-0 items-center gap-1.5">
           <FileText className="size-3.5 shrink-0" aria-hidden />
           <dt className="sr-only">Документы</dt>
