@@ -47,7 +47,9 @@ export function planSave(
     }
     const edited = decision === 'accepted' ? edits[id] : undefined;
     decisions.push(
-      edited ? { suggestion_id: id, decision, edited_text: edited } : { suggestion_id: id, decision },
+      edited
+        ? { suggestion_id: id, decision, edited_text: edited }
+        : { suggestion_id: id, decision },
     );
   }
   return { decisions, finalize: serverPendingCount - decisions.length === 0, stale };

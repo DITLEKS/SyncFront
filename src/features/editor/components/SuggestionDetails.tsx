@@ -145,7 +145,9 @@ export function SuggestionDetails({
             </p>
           </div>
         ) : (
-          <Fragment label={edited ? 'Новый текст (отредактирован)' : 'Новый текст'}>{newText}</Fragment>
+          <Fragment label={edited ? 'Новый текст (отредактирован)' : 'Новый текст'}>
+            {newText}
+          </Fragment>
         )}
         {type === 'add' ? (
           <p className="text-xs text-muted-foreground">

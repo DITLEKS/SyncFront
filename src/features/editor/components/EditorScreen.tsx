@@ -431,7 +431,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
             {!panelOpen && progress.pending > 0 ? (
               <span
                 aria-hidden
-                className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground tabular-nums"
+                className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-primary px-1 text-[10px] font-semibold tabular-nums leading-4 text-primary-foreground"
               >
                 {progress.pending}
               </span>

@@ -251,7 +251,7 @@ const SuggestionCard = memo(function SuggestionCard({
               className={cn(
                 'ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-medium transition-opacity',
                 status === 'accepted' ? 'text-emerald-700' : 'text-muted-foreground',
-                showUndo && 'group-hover:opacity-0 group-focus-within:opacity-0',
+                showUndo && 'group-focus-within:opacity-0 group-hover:opacity-0',
               )}
             >
               {status === 'accepted' ? (
