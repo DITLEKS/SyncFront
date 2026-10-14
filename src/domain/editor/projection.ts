@@ -23,7 +23,7 @@ export interface DocumentSection {
 export type LocateIssue =
   /** Фрагмента (для add — якоря) нет в тексте: сервер правку не применит. */
   | 'not_found'
-  /** Фрагмент пересекается с другой правкой: результат экспорта может отличаться. */
+  /** Фрагмент (или якорь) пересекается с другой правкой: результат экспорта может отличаться. */
   | 'overlap'
   /** Нет текста для замены или вставки, либо фрагмент занимает несколько абзацев docx. */
   | 'not_applicable'
@@ -150,8 +150,12 @@ export function buildProjection(input: ProjectionInput): Projection {
         changeOf(suggestion, status, newTextOf(suggestion)),
         suggestion,
       );
-      if (!placed) {
+      if (placed === 'not_found') {
         located[suggestion.id] = { issue: 'not_found', exportable: false, inline: false };
+        continue;
+      }
+      if (placed === 'overlap') {
+        located[suggestion.id] = { issue: 'overlap', exportable: true, inline: false };
         continue;
       }
       pieces = placed;
@@ -234,19 +238,21 @@ function findTextPiece(
 /**
  * Разместить добавление как экспортёры SyncBack: сразу после строки с якорем.
  * Якорь ищется в тексте, каким его видит сервер на этом шаге (с уже принятыми правками).
- * null — якоря нет или он не найден: сервер такое добавление не применит.
+ * 'not_found' — якоря нет или он не найден: сервер такое добавление не применит.
+ * 'overlap' — якорь есть, но лежит внутри другой правки: сервер вставку применит, показать её точно нельзя.
  */
 function placeAddition(
   pieces: Piece[],
   change: ChangeSegment,
   suggestion: EditorSuggestion,
-): Piece[] | null {
+): Piece[] | 'not_found' | 'overlap' {
   const anchor = (suggestion.original_text ?? '').trim();
-  if (!anchor) return null;
+  if (!anchor) return 'not_found';
   const contributions = pieces.map(serverText);
   const index = contributions.join('').indexOf(anchor);
-  const hit = index === -1 ? null : findTextPiece(pieces, contributions, index, anchor.length);
-  if (!hit) return null;
+  if (index === -1) return 'not_found';
+  const hit = findTextPiece(pieces, contributions, index, anchor.length);
+  if (!hit) return 'overlap';
   const from = hit.start + anchor.length;
   const newline = hit.piece.text.indexOf('\n', from);
   const at = newline === -1 ? hit.piece.text.length : newline;

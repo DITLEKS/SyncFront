@@ -220,6 +220,19 @@ describe('buildProjection', () => {
       expect(result.segments).toEqual([{ kind: 'text', text }]);
     });
 
+    it('якорь внутри другой правки — overlap: сервер применит, в тексте не показывается', () => {
+      const m = s({
+        change_type: 'modify',
+        original_text: 'строка один',
+        suggested_text: 'X',
+        status: 'rejected',
+      });
+      const add = s({ change_type: 'add', original_text: 'строка один', suggested_text: 'новое' });
+      const result = project(text, [m, add], { sections });
+      expect(result.located[add.id]).toEqual({ issue: 'overlap', exportable: true, inline: false });
+      expect(changes(result.segments).map((x) => x.id)).toEqual([m.id]);
+    });
+
     it('непринятое добавление не мешает поиску следующих правок', () => {
       const add = s({ change_type: 'add', original_text: 'строка один', suggested_text: 'X' });
       const m = s({ change_type: 'modify', original_text: 'строка два', suggested_text: 'Y' });
@@ -249,10 +262,11 @@ describe('exportedText совпадает с экспортом сервера',
           status: 'accepted',
         }),
         s({ change_type: 'delete', original_text: 'Оплата в рублях.', status: 'accepted' }),
+        // Отклонённая правка не должна пересекаться с якорем add ниже: overlap эталон не моделирует.
         s({
           change_type: 'modify',
-          original_text: 'Конец',
-          suggested_text: 'Финал',
+          original_text: 'Срок',
+          suggested_text: 'Период',
           status: 'rejected',
         }),
         s({ change_type: 'add', suggested_text: 'Приложение 1', status: 'accepted' }),
