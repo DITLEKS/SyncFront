@@ -51,8 +51,16 @@
     /* Более тёмный цвет кнопок сохраняет контраст белого текста. */
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
-    --border: 255 8.3% 9.4% / 0.07;
-    --input: 255 8.3% 9.4% / 0.12;
+    /*
+     * Рамки и поля — полупрозрачный цвет текста. Альфа вынесена в отдельный токен:
+     * если держать её внутри --border, модификаторы Tailwind (border-border/70, ring-border/50)
+     * дают hsl(… / 0.07 / 0.7) — невалидный цвет, и браузер рисует рамку currentColor (чёрным).
+     * Сборка цвета — в tailwind.config.ts: hsl(var(--border) / calc(var(--border-alpha) * <alpha-value>)).
+     */
+    --border: 255 8.3% 9.4%;
+    --border-alpha: 0.07;
+    --input: 255 8.3% 9.4%;
+    --input-alpha: 0.12;
     --ring: 238.7 83.5% 66.7%;
     --radius: 0.5rem;
   }
