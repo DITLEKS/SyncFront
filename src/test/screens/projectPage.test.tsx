@@ -54,7 +54,7 @@ describe('Страница проекта', () => {
     expect(screen.getByRole('link', { name: 'Рассмотреть правки' })).toBeInTheDocument();
   });
 
-  it('раскрывает только одну строку источников; на ревью источники только для просмотра', async () => {
+  it('раскрывает только одну строку источников; на ревью источники можно менять', async () => {
     const user = userEvent.setup();
     setup();
     await screen.findByRole('heading', { level: 1 });
@@ -70,10 +70,11 @@ describe('Страница проекта', () => {
     expect(draftToggle).toHaveAttribute('aria-expanded', 'false');
     expect(reviewToggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Тикет PAY-12')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Добавить файл' })).not.toBeInTheDocument();
+    // Источники заблокированы только во время анализа: на ревью их можно добавлять и удалять.
+    expect(screen.getByRole('button', { name: 'Добавить файл' })).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Удалить источник Тикет PAY-12' }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Удалить источник Тикет PAY-12' }),
+    ).toBeInTheDocument();
   });
 
   it('423 при добавлении базового источника показывает текст сервера, список не меняется', async () => {
