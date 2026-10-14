@@ -85,20 +85,24 @@ export function useEditorModel(
     [edits],
   );
 
-  const projections = useMemo<Record<'suggestions' | 'clean', Projection>>(() => {
-    const base = {
-      text: content.plain_text,
-      sections: content.sections,
-      format: meta.format,
-      suggestions,
-      statusOf,
-      newTextOf,
-    };
-    return {
-      suggestions: buildProjection({ ...base, addPlacement: 'section' }),
-      clean: buildProjection({ ...base, addPlacement: 'end' }),
-    };
-  }, [content.plain_text, content.sections, meta.format, suggestions, statusOf, newTextOf]);
+  // Добавления размещаются по месту так же, как при экспорте, поэтому «Правки» и «Чистовик»
+  // строятся на одной проекции; разница между режимами — только в отрисовке решённых правок.
+  const projection = useMemo(
+    () =>
+      buildProjection({
+        text: content.plain_text,
+        sections: content.sections,
+        format: meta.format,
+        suggestions,
+        statusOf,
+        newTextOf,
+      }),
+    [content.plain_text, content.sections, meta.format, suggestions, statusOf, newTextOf],
+  );
+  const projections = useMemo<Record<'suggestions' | 'clean', Projection>>(
+    () => ({ suggestions: projection, clean: projection }),
+    [projection],
+  );
 
   const progress = useMemo(
     () => reviewProgress(counters, suggestions, decisions),

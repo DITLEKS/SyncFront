@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { SuggestionResponse } from '@/api/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import type { LocatedSuggestion } from '@/domain/editor/projection';
+import type { AddPlacement, LocatedSuggestion } from '@/domain/editor/projection';
 import { decisionLabel, type Decision, type SuggestionStatus } from '@/domain/editor/suggestion';
 
 import { EDITOR_TEXTS, ISSUE_TEXTS } from '../model/texts';
@@ -25,6 +25,12 @@ interface SuggestionDetailsProps {
   onClose: () => void;
 }
 
+const ADD_PLACEMENT_TEXTS: Record<AddPlacement, string> = {
+  anchor: EDITOR_TEXTS.addAfterAnchor,
+  section: EDITOR_TEXTS.addAtSectionEnd,
+  end: EDITOR_TEXTS.addAtEnd,
+};
+
 function Fragment({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
@@ -40,7 +46,8 @@ function Fragment({ label, children }: { label: string; children: React.ReactNod
  * Карточка «Предложение ИИ» по макету. Блок «источника» пока показывает раздел документа:
  * источника правки в SuggestionResponse нет (SyncBack#70). «Новый текст» нерассмотренной
  * правки можно отредактировать перед принятием — текст уходит в PUT /review как edited_text
- * (SyncBack#73) и при экспорте заменяет текст ИИ.
+ * (SyncBack#73) и при экспорте заменяет текст ИИ. Для добавления original_text — якорь,
+ * после которого встанет новый текст (SyncBack#76).
  */
 export function SuggestionDetails({
   suggestion,
@@ -65,6 +72,7 @@ export function SuggestionDetails({
   const aiText = (suggestion.suggested_text ?? '').trim();
   const trimmedDraft = draft.trim();
   const edited = (editable ? trimmedDraft : newText.trim()) !== aiText;
+  const anchor = type === 'add' ? (suggestion.original_text ?? '').trim() : '';
 
   const accept = () => {
     onDecide('accepted', editable && edited ? trimmedDraft : undefined);
@@ -112,6 +120,7 @@ export function SuggestionDetails({
         {type !== 'add' ? (
           <Fragment label="Текущий текст">{suggestion.original_text}</Fragment>
         ) : null}
+        {anchor ? <Fragment label="Вставить после">{anchor}</Fragment> : null}
         {type === 'delete' ? (
           <p className="text-sm text-red-700">{EDITOR_TEXTS.deleteMessage}</p>
         ) : editable ? (
@@ -139,7 +148,9 @@ export function SuggestionDetails({
           <Fragment label={edited ? 'Новый текст (отредактирован)' : 'Новый текст'}>{newText}</Fragment>
         )}
         {type === 'add' ? (
-          <p className="text-xs text-muted-foreground">{EDITOR_TEXTS.addAtEnd}</p>
+          <p className="text-xs text-muted-foreground">
+            {ADD_PLACEMENT_TEXTS[located?.placement ?? 'end']}
+          </p>
         ) : null}
 
         {located?.issue ? (
