@@ -7,8 +7,8 @@
  *   каждая — к уже изменённому тексту;
  * - modify/delete заменяют первое вхождение original_text во всём тексте;
  *   в docx вхождение ищется внутри одного абзаца, поэтому фрагмент с переводом строки не применится;
- * - add вставляется по месту (SyncBack#76): сразу после строки с якорем original_text,
- *   иначе в конец раздела section_ref, иначе в конец документа;
+ * - add вставляется только по якорю — сразу после строки с original_text (SyncBack#78);
+ *   без якоря или с ненайденным якорем сервер добавление не применит, место за модель не выбираем;
  * - новый текст правки берётся из newTextOf: отредактированный пользователем важнее текста ИИ.
  */
 import type { ChangeType, EditorSuggestion, SuggestionStatus } from './suggestion';
@@ -21,7 +21,7 @@ export interface DocumentSection {
 
 /** Почему правку нельзя показать в тексте или её применение отличается от ожидаемого. */
 export type LocateIssue =
-  /** Фрагмента нет в тексте: сервер правку не применит. */
+  /** Фрагмента (для add — якоря) нет в тексте: сервер правку не применит. */
   | 'not_found'
   /** Фрагмент пересекается с другой правкой: результат экспорта может отличаться. */
   | 'overlap'
@@ -30,17 +30,12 @@ export type LocateIssue =
   /** Первое вхождение — вне указанного раздела: заменится именно оно. */
   | 'outside_section';
 
-/** Куда встанет добавление при экспорте — в порядке приоритета сервера. */
-export type AddPlacement = 'anchor' | 'section' | 'end';
-
 export interface LocatedSuggestion {
   issue: LocateIssue | null;
   /** Будет ли правка применена при экспорте, если её принять. */
   exportable: boolean;
   /** Показана ли правка внутри текста. */
   inline: boolean;
-  /** Только для add: как было выбрано место вставки. */
-  placement?: AddPlacement;
 }
 
 export interface TextSegment {
@@ -154,15 +149,13 @@ export function buildProjection(input: ProjectionInput): Projection {
         pieces,
         changeOf(suggestion, status, newTextOf(suggestion)),
         suggestion,
-        sections,
       );
-      pieces = placed.pieces;
-      located[suggestion.id] = {
-        issue: null,
-        exportable: true,
-        inline: true,
-        placement: placed.placement,
-      };
+      if (!placed) {
+        located[suggestion.id] = { issue: 'not_found', exportable: false, inline: false };
+        continue;
+      }
+      pieces = placed;
+      located[suggestion.id] = { issue: null, exportable: true, inline: true };
       continue;
     }
 
@@ -239,35 +232,25 @@ function findTextPiece(
 }
 
 /**
- * Разместить добавление как экспортёры SyncBack: после строки с якорем → в конец раздела → в конец.
+ * Разместить добавление как экспортёры SyncBack: сразу после строки с якорем.
  * Якорь ищется в тексте, каким его видит сервер на этом шаге (с уже принятыми правками).
+ * null — якоря нет или он не найден: сервер такое добавление не применит.
  */
 function placeAddition(
   pieces: Piece[],
   change: ChangeSegment,
   suggestion: EditorSuggestion,
-  sections: readonly DocumentSection[],
-): { pieces: Piece[]; placement: AddPlacement } {
+): Piece[] | null {
   const anchor = (suggestion.original_text ?? '').trim();
-  if (anchor) {
-    const contributions = pieces.map(serverText);
-    const index = contributions.join('').indexOf(anchor);
-    const hit = index === -1 ? null : findTextPiece(pieces, contributions, index, anchor.length);
-    if (hit) {
-      const from = hit.start + anchor.length;
-      const newline = hit.piece.text.indexOf('\n', from);
-      const at = newline === -1 ? hit.piece.text.length : newline;
-      return { pieces: splitPiece(pieces, hit.index, at, change), placement: 'anchor' };
-    }
-  }
-
-  const ref = suggestion.section_ref?.trim().toLowerCase();
-  const section = ref ? sections.find((s) => s.ref.trim().toLowerCase() === ref) : undefined;
-  if (section) {
-    return { pieces: insertAt(pieces, section.end_offset, change), placement: 'section' };
-  }
-
-  return { pieces: [...pieces, change], placement: 'end' };
+  if (!anchor) return null;
+  const contributions = pieces.map(serverText);
+  const index = contributions.join('').indexOf(anchor);
+  const hit = index === -1 ? null : findTextPiece(pieces, contributions, index, anchor.length);
+  if (!hit) return null;
+  const from = hit.start + anchor.length;
+  const newline = hit.piece.text.indexOf('\n', from);
+  const at = newline === -1 ? hit.piece.text.length : newline;
+  return splitPiece(pieces, hit.index, at, change);
 }
 
 /** Вставить правку внутрь текстового куска по локальному смещению. */
@@ -280,18 +263,6 @@ function splitPiece(pieces: Piece[], index: number, at: number, change: ChangeSe
       ? [{ kind: 'text', text: piece.text.slice(at), origin: piece.origin + at }]
       : [];
   return [...pieces.slice(0, index), ...before, change, ...after, ...pieces.slice(index + 1)];
-}
-
-/** Вставить добавление перед исходным офсетом — концом раздела. */
-function insertAt(pieces: Piece[], originOffset: number, change: ChangeSegment): Piece[] {
-  for (let i = 0; i < pieces.length; i += 1) {
-    const piece = pieces[i];
-    if (!piece || piece.kind !== 'text') continue;
-    const end = piece.origin + piece.text.length;
-    if (originOffset < piece.origin || originOffset > end) continue;
-    return splitPiece(pieces, i, originOffset - piece.origin, change);
-  }
-  return [...pieces, change];
 }
 
 function toSegment(piece: Piece): Segment {

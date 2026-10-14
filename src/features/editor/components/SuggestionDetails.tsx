@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { SuggestionResponse } from '@/api/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import type { AddPlacement, LocatedSuggestion } from '@/domain/editor/projection';
+import type { LocatedSuggestion } from '@/domain/editor/projection';
 import { decisionLabel, type Decision, type SuggestionStatus } from '@/domain/editor/suggestion';
 
 import { EDITOR_TEXTS, ISSUE_TEXTS } from '../model/texts';
@@ -25,12 +25,6 @@ interface SuggestionDetailsProps {
   onClose: () => void;
 }
 
-const ADD_PLACEMENT_TEXTS: Record<AddPlacement, string> = {
-  anchor: EDITOR_TEXTS.addAfterAnchor,
-  section: EDITOR_TEXTS.addAtSectionEnd,
-  end: EDITOR_TEXTS.addAtEnd,
-};
-
 function Fragment({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
@@ -47,7 +41,7 @@ function Fragment({ label, children }: { label: string; children: React.ReactNod
  * источника правки в SuggestionResponse нет (SyncBack#70). «Новый текст» нерассмотренной
  * правки можно отредактировать перед принятием — текст уходит в PUT /review как edited_text
  * (SyncBack#73) и при экспорте заменяет текст ИИ. Для добавления original_text — якорь,
- * после которого встанет новый текст (SyncBack#76).
+ * после которого встанет новый текст; без найденного якоря правка не применяется (SyncBack#78).
  */
 export function SuggestionDetails({
   suggestion,
@@ -149,10 +143,8 @@ export function SuggestionDetails({
             {newText}
           </Fragment>
         )}
-        {type === 'add' ? (
-          <p className="text-xs text-muted-foreground">
-            {ADD_PLACEMENT_TEXTS[located?.placement ?? 'end']}
-          </p>
+        {type === 'add' && located?.inline ? (
+          <p className="text-xs text-muted-foreground">{EDITOR_TEXTS.addAfterAnchor}</p>
         ) : null}
 
         {located?.issue ? (

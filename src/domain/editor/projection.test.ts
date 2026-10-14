@@ -32,7 +32,7 @@ function project(
   });
 }
 
-// ── Эталон: построчный перенос TextExporter / DocxExporter из SyncBack (после PR #76) ──
+// ── Эталон: построчный перенос TextExporter / DocxExporter из SyncBack (после PR #78) ──
 
 function mdSections(text: string) {
   const matches = [...text.matchAll(/^(#{1,6})\s+(.+)$/gm)];
@@ -50,22 +50,15 @@ function insertBlock(text: string, position: number, block: string): string {
   return joined + (tail ? `\n\n${tail}` : '\n');
 }
 
+/** Только по якорю: без него или с ненайденным якорем сервер текст не меняет. */
 function placeAdditionText(text: string, c: EditorSuggestion): string {
   const block = (c.suggested_text ?? '').replace(/^\n+|\n+$/g, '');
   const anchor = (c.original_text ?? '').trim();
-  if (anchor) {
-    const index = text.indexOf(anchor);
-    if (index !== -1) {
-      const newline = text.indexOf('\n', index + anchor.length);
-      return insertBlock(text, newline === -1 ? text.length : newline, block);
-    }
-  }
-  const ref = c.section_ref?.trim().toLowerCase();
-  if (ref) {
-    const section = mdSections(text).find((x) => x.ref.toLowerCase() === ref);
-    if (section) return insertBlock(text, section.end, block);
-  }
-  return insertBlock(text, text.length, block);
+  if (!anchor) return text;
+  const index = text.indexOf(anchor);
+  if (index === -1) return text;
+  const newline = text.indexOf('\n', index + anchor.length);
+  return insertBlock(text, newline === -1 ? text.length : newline, block);
 }
 
 function serverExport(text: string, accepted: EditorSuggestion[], format: string): string {
@@ -79,9 +72,7 @@ function serverExport(text: string, accepted: EditorSuggestion[], format: string
       } else if (c.change_type === 'add' && c.suggested_text) {
         const anchor = old.trim();
         const i = anchor ? paragraphs.findIndex((p) => p.includes(anchor)) : -1;
-        // Разделы docx в эталоне не моделируем (нужны стили Heading): якорь или конец.
         if (i !== -1) paragraphs.splice(i + 1, 0, c.suggested_text);
-        else paragraphs.push(c.suggested_text);
       }
     }
     return paragraphs.join('\n');
@@ -187,7 +178,7 @@ describe('buildProjection', () => {
       { ref: 'B', start_offset: text.indexOf('# B'), end_offset: text.length },
     ];
 
-    it('по якорю — сразу после строки с ним', () => {
+    it('по якорю — сразу после строки с ним, даже если section_ref указывает в другой раздел', () => {
       const add = s({
         change_type: 'add',
         original_text: 'строка один',
@@ -200,30 +191,33 @@ describe('buildProjection', () => {
         expect.objectContaining({ id: add.id }),
         { kind: 'text', text: '\nстрока два\n# B\nтекст B' },
       ]);
-      expect(result.located[add.id]?.placement).toBe('anchor');
+      expect(result.located[add.id]).toEqual({ issue: null, exportable: true, inline: true });
     });
 
-    it('без якоря — в конец раздела (без учёта регистра)', () => {
-      const add = s({ change_type: 'add', suggested_text: 'новое', section_ref: 'a' });
-      const result = project(text, [add], { sections });
-      expect(result.segments).toEqual([
-        { kind: 'text', text: '# A\nстрока один\nстрока два\n' },
-        expect.objectContaining({ id: add.id }),
-        { kind: 'text', text: '# B\nтекст B' },
-      ]);
-      expect(result.located[add.id]?.placement).toBe('section');
-    });
-
-    it('ненайденный якорь и неизвестный раздел — в конец документа', () => {
-      const add = s({
+    it('без якоря или с ненайденным якорем — not_found, в тексте не показывается', () => {
+      const noAnchor = s({ change_type: 'add', suggested_text: 'новое', section_ref: 'A' });
+      const blankAnchor = s({
+        change_type: 'add',
+        original_text: '   ',
+        suggested_text: 'новое',
+        section_ref: 'A',
+      });
+      const missing = s({
         change_type: 'add',
         original_text: 'такого нет',
         suggested_text: 'новое',
-        section_ref: 'Z',
+        section_ref: 'A',
       });
-      const result = project(text, [add], { sections });
-      expect(result.segments.at(-1)).toEqual(expect.objectContaining({ id: add.id }));
-      expect(result.located[add.id]?.placement).toBe('end');
+      const result = project(text, [noAnchor, blankAnchor, missing], { sections });
+      for (const add of [noAnchor, blankAnchor, missing]) {
+        expect(result.located[add.id]).toEqual({
+          issue: 'not_found',
+          exportable: false,
+          inline: false,
+        });
+      }
+      expect(changes(result.segments)).toHaveLength(0);
+      expect(result.segments).toEqual([{ kind: 'text', text }]);
     });
 
     it('непринятое добавление не мешает поиску следующих правок', () => {
@@ -244,7 +238,7 @@ describe('buildProjection', () => {
 describe('exportedText совпадает с экспортом сервера', () => {
   const cases: { name: string; format: string; text: string; list: EditorSuggestion[] }[] = [
     {
-      name: 'txt: modify, delete, add в конец',
+      name: 'txt: modify, delete; add без якоря не экспортируется',
       format: 'txt',
       text: 'Срок — 10 дней.\nОплата в рублях.\n\nКонец\n\n',
       list: [
@@ -262,11 +256,16 @@ describe('exportedText совпадает с экспортом сервера',
           status: 'rejected',
         }),
         s({ change_type: 'add', suggested_text: 'Приложение 1', status: 'accepted' }),
-        s({ change_type: 'add', suggested_text: 'Приложение 2', status: 'accepted' }),
+        s({
+          change_type: 'add',
+          original_text: 'Конец',
+          suggested_text: 'Приложение 2',
+          status: 'accepted',
+        }),
       ],
     },
     {
-      name: 'md: add по якорю внутри раздела и add без якоря в конец раздела',
+      name: 'md: add по якорю внутри раздела; add без якоря пропускается',
       format: 'md',
       text: '# Сроки\nСрок ответа — 10 дней.\nОплата картой.\n\n# Ответственность\nСтороны несут ответственность.\n',
       list: [
@@ -311,7 +310,7 @@ describe('exportedText совпадает с экспортом сервера',
       ],
     },
     {
-      name: 'docx: абзацы, удаление и добавление в конец',
+      name: 'docx: абзацы, удаление; add без якоря пропускается',
       format: 'docx',
       text: 'Первый абзац\nВторой абзац\nТретий',
       list: [
