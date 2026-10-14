@@ -7,7 +7,8 @@
  *   каждая — к уже изменённому тексту;
  * - modify/delete заменяют первое вхождение original_text во всём тексте;
  *   в docx вхождение ищется внутри одного абзаца, поэтому фрагмент с переводом строки не применится;
- * - add дописывается в конец документа;
+ * - add вставляется по месту (SyncBack#76): сразу после строки с якорем original_text,
+ *   иначе в конец раздела section_ref, иначе в конец документа;
  * - новый текст правки берётся из newTextOf: отредактированный пользователем важнее текста ИИ.
  */
 import type { ChangeType, EditorSuggestion, SuggestionStatus } from './suggestion';
@@ -29,12 +30,17 @@ export type LocateIssue =
   /** Первое вхождение — вне указанного раздела: заменится именно оно. */
   | 'outside_section';
 
+/** Куда встанет добавление при экспорте — в порядке приоритета сервера. */
+export type AddPlacement = 'anchor' | 'section' | 'end';
+
 export interface LocatedSuggestion {
   issue: LocateIssue | null;
   /** Будет ли правка применена при экспорте, если её принять. */
   exportable: boolean;
   /** Показана ли правка внутри текста. */
   inline: boolean;
+  /** Только для add: как было выбрано место вставки. */
+  placement?: AddPlacement;
 }
 
 export interface TextSegment {
@@ -53,8 +59,6 @@ export interface ChangeSegment {
 
 export type Segment = TextSegment | ChangeSegment;
 
-export type AddPlacement = 'section' | 'end';
-
 export interface ProjectionInput {
   text: string;
   sections: readonly DocumentSection[];
@@ -64,11 +68,6 @@ export interface ProjectionInput {
   statusOf: (suggestion: EditorSuggestion) => SuggestionStatus;
   /** Новый текст правки с учётом правок пользователя; по умолчанию — suggested_text. */
   newTextOf?: (suggestion: EditorSuggestion) => string;
-  /**
-   * Где показывать добавления. Экспорт дописывает их в конец документа (`end`);
-   * в режиме «Правки» читать удобнее рядом с разделом (`section`).
-   */
-  addPlacement: AddPlacement;
 }
 
 export interface Projection {
@@ -88,6 +87,8 @@ type Piece = TextPiece | ChangeSegment;
 /** Вклад куска в текст, который в этот момент видит сервер. */
 function serverText(piece: Piece): string {
   if (piece.kind === 'text') return piece.text;
+  // У добавления oldText — якорь, он уже есть в тексте; непринятое добавление ничего не вносит.
+  if (piece.changeType === 'add') return piece.status === 'accepted' ? piece.newText : '';
   if (piece.status !== 'accepted') return piece.oldText;
   return piece.changeType === 'delete' ? '' : piece.newText;
 }
@@ -135,12 +136,11 @@ function changeOf(
 }
 
 export function buildProjection(input: ProjectionInput): Projection {
-  const { text, format, suggestions, statusOf, addPlacement } = input;
+  const { text, format, suggestions, statusOf } = input;
   const newTextOf = input.newTextOf ?? ((s: EditorSuggestion) => s.suggested_text ?? '');
   const sections = sectionsInUtf16(text, input.sections);
   const located: Record<string, LocatedSuggestion> = {};
   let pieces: Piece[] = [{ kind: 'text', text, origin: 0 }];
-  const adds: { suggestion: EditorSuggestion; status: SuggestionStatus }[] = [];
 
   for (const suggestion of suggestions) {
     const status = statusOf(suggestion);
@@ -148,9 +148,21 @@ export function buildProjection(input: ProjectionInput): Projection {
     if (suggestion.change_type === 'add') {
       if (!suggestion.suggested_text) {
         located[suggestion.id] = { issue: 'not_applicable', exportable: false, inline: false };
-      } else {
-        adds.push({ suggestion, status });
+        continue;
       }
+      const placed = placeAddition(
+        pieces,
+        changeOf(suggestion, status, newTextOf(suggestion)),
+        suggestion,
+        sections,
+      );
+      pieces = placed.pieces;
+      located[suggestion.id] = {
+        issue: null,
+        exportable: true,
+        inline: true,
+        placement: placed.placement,
+      };
       continue;
     }
 
@@ -167,25 +179,14 @@ export function buildProjection(input: ProjectionInput): Projection {
       continue;
     }
 
-    let cursor = 0;
-    let target = -1;
-    for (let i = 0; i < pieces.length; i += 1) {
-      const length = contributions[i]?.length ?? 0;
-      const piece = pieces[i];
-      if (piece?.kind === 'text' && index >= cursor && index + old.length <= cursor + length) {
-        target = i;
-        break;
-      }
-      cursor += length;
-    }
-    const piece = pieces[target];
-    if (!piece || piece.kind !== 'text') {
+    const hit = findTextPiece(pieces, contributions, index, old.length);
+    if (!hit) {
       // Сервер применит правку к тексту, уже изменённому соседней правкой; показать это точно нельзя.
       located[suggestion.id] = { issue: 'overlap', exportable: true, inline: false };
       continue;
     }
+    const { index: target, piece, start } = hit;
 
-    const start = index - cursor;
     const originStart = piece.origin + start;
     const section = suggestion.section_ref
       ? sections.find((s) => s.ref === suggestion.section_ref)
@@ -208,17 +209,77 @@ export function buildProjection(input: ProjectionInput): Projection {
     pieces = [...pieces.slice(0, target), ...replacement, ...pieces.slice(target + 1)];
   }
 
-  for (const { suggestion, status } of adds) {
-    located[suggestion.id] = { issue: null, exportable: true, inline: true };
-    const section =
-      addPlacement === 'section' && suggestion.section_ref
-        ? sections.find((s) => s.ref === suggestion.section_ref)
-        : undefined;
-    const change = changeOf(suggestion, status, newTextOf(suggestion));
-    pieces = section ? insertAt(pieces, section.end_offset, change) : [...pieces, change];
+  return { segments: pieces.map(toSegment), located };
+}
+
+interface PieceHit {
+  index: number;
+  piece: TextPiece;
+  /** Смещение внутри куска. */
+  start: number;
+}
+
+/** Найти текстовый кусок, целиком содержащий диапазон серверного текста [index, index + length). */
+function findTextPiece(
+  pieces: Piece[],
+  contributions: string[],
+  index: number,
+  length: number,
+): PieceHit | null {
+  let cursor = 0;
+  for (let i = 0; i < pieces.length; i += 1) {
+    const size = contributions[i]?.length ?? 0;
+    const piece = pieces[i];
+    if (piece?.kind === 'text' && index >= cursor && index + length <= cursor + size) {
+      return { index: i, piece, start: index - cursor };
+    }
+    cursor += size;
+  }
+  return null;
+}
+
+/**
+ * Разместить добавление как экспортёры SyncBack: после строки с якорем → в конец раздела → в конец.
+ * Якорь ищется в тексте, каким его видит сервер на этом шаге (с уже принятыми правками).
+ */
+function placeAddition(
+  pieces: Piece[],
+  change: ChangeSegment,
+  suggestion: EditorSuggestion,
+  sections: readonly DocumentSection[],
+): { pieces: Piece[]; placement: AddPlacement } {
+  const anchor = (suggestion.original_text ?? '').trim();
+  if (anchor) {
+    const contributions = pieces.map(serverText);
+    const index = contributions.join('').indexOf(anchor);
+    const hit = index === -1 ? null : findTextPiece(pieces, contributions, index, anchor.length);
+    if (hit) {
+      const from = hit.start + anchor.length;
+      const newline = hit.piece.text.indexOf('\n', from);
+      const at = newline === -1 ? hit.piece.text.length : newline;
+      return { pieces: splitPiece(pieces, hit.index, at, change), placement: 'anchor' };
+    }
   }
 
-  return { segments: pieces.map(toSegment), located };
+  const ref = suggestion.section_ref?.trim().toLowerCase();
+  const section = ref ? sections.find((s) => s.ref.trim().toLowerCase() === ref) : undefined;
+  if (section) {
+    return { pieces: insertAt(pieces, section.end_offset, change), placement: 'section' };
+  }
+
+  return { pieces: [...pieces, change], placement: 'end' };
+}
+
+/** Вставить правку внутрь текстового куска по локальному смещению. */
+function splitPiece(pieces: Piece[], index: number, at: number, change: ChangeSegment): Piece[] {
+  const piece = pieces[index];
+  if (!piece || piece.kind !== 'text') return [...pieces, change];
+  const before: Piece[] = at > 0 ? [{ ...piece, text: piece.text.slice(0, at) }] : [];
+  const after: Piece[] =
+    at < piece.text.length
+      ? [{ kind: 'text', text: piece.text.slice(at), origin: piece.origin + at }]
+      : [];
+  return [...pieces.slice(0, index), ...before, change, ...after, ...pieces.slice(index + 1)];
 }
 
 /** Вставить добавление перед исходным офсетом — концом раздела. */
@@ -228,13 +289,7 @@ function insertAt(pieces: Piece[], originOffset: number, change: ChangeSegment):
     if (!piece || piece.kind !== 'text') continue;
     const end = piece.origin + piece.text.length;
     if (originOffset < piece.origin || originOffset > end) continue;
-    const at = originOffset - piece.origin;
-    const before: Piece[] = at > 0 ? [{ ...piece, text: piece.text.slice(0, at) }] : [];
-    const after: Piece[] =
-      at < piece.text.length
-        ? [{ kind: 'text', text: piece.text.slice(at), origin: originOffset }]
-        : [];
-    return [...pieces.slice(0, i), ...before, change, ...after, ...pieces.slice(i + 1)];
+    return splitPiece(pieces, i, originOffset - piece.origin, change);
   }
   return [...pieces, change];
 }
@@ -245,27 +300,54 @@ function toSegment(piece: Piece): Segment {
 
 /**
  * Текст, который получится при экспорте: принятые правки применены, остальные — нет.
- * Нужен для «Чистовика» без разметки и для проверки совпадения с сервером в тестах.
+ * Повторяет нормализацию пустых строк TextExporter вокруг вставленного абзаца
+ * (ровно одна пустая строка до и после) и вставку абзаца DocxExporter.
  */
 export function exportedText(projection: Projection, format: string): string {
+  const docx = isDocx(format);
   let body = '';
-  const addedTexts: string[] = [];
+  // После вставки в тексте сервер срезает ведущие переводы строк у хвоста и ставит одну пустую строку.
+  let afterAdd = false;
+
+  const append = (text: string) => {
+    if (!text) return;
+    if (afterAdd && !docx) {
+      const trimmed = text.replace(/^\n+/, '');
+      if (!trimmed) return;
+      body += `\n\n${trimmed}`;
+      afterAdd = false;
+      return;
+    }
+    body += text;
+    afterAdd = false;
+  };
+
   for (const segment of projection.segments) {
     if (segment.kind === 'text') {
-      body += segment.text;
-    } else if (segment.changeType === 'add') {
-      if (segment.status === 'accepted') addedTexts.push(segment.newText);
-    } else {
-      body +=
-        segment.status === 'accepted'
-          ? segment.changeType === 'delete'
-            ? ''
-            : segment.newText
-          : segment.oldText;
+      append(segment.text);
+      continue;
     }
+    if (segment.changeType === 'add') {
+      if (segment.status !== 'accepted') continue;
+      const block = segment.newText.replace(/^\n+|\n+$/g, '');
+      if (docx) {
+        body = body ? `${body}\n${block}` : block;
+      } else {
+        const head = body.replace(/\n+$/, '');
+        body = head ? `${head}\n\n${block}` : block;
+        afterAdd = true;
+      }
+      continue;
+    }
+    append(
+      segment.status === 'accepted'
+        ? segment.changeType === 'delete'
+          ? ''
+          : segment.newText
+        : segment.oldText,
+    );
   }
-  for (const added of addedTexts) {
-    body = isDocx(format) ? `${body}\n${added}` : `${body.replace(/\n+$/, '')}\n\n${added}\n`;
-  }
+
+  if (afterAdd && !docx) body += '\n';
   return body;
 }
