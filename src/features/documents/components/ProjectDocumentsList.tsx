@@ -23,8 +23,7 @@ interface ProjectDocumentsListProps {
   baseSources: SourceResponse[];
 }
 
-export const LOCKED_SOURCES_TEXT =
-  'Во время анализа источники доступны только для просмотра';
+export const LOCKED_SOURCES_TEXT = 'Во время анализа источники доступны только для просмотра';
 
 /** Документы проекта; одновременно раскрыта не больше чем одна строка с источниками. */
 export function ProjectDocumentsList({
