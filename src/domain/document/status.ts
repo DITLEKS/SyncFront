@@ -52,12 +52,14 @@ export function isDocumentStatus(value: unknown): value is DocumentStatus {
 /**
  * Зеркало DocumentLifecycle бэкенда (app/domain/lifecycle.py) для списков,
  * где нет permissions редактора. В редакторе приоритет у permissions из ответа API.
+ *
+ * Источники заморожены только пока идёт анализ: на ревью их можно менять,
+ * уже созданные правки остаются до следующего анализа.
  */
 export const documentPolicy = {
   canStartAnalysis: (status: DocumentStatus): boolean => status !== 'in_progress',
   analysisNeedsConfirmation: (status: DocumentStatus): boolean => status === 'ready',
-  canEditSources: (status: DocumentStatus): boolean =>
-    status !== 'in_progress' && status !== 'awaiting_approval',
+  canEditSources: (status: DocumentStatus): boolean => status !== 'in_progress',
   canReview: (status: DocumentStatus): boolean => status === 'awaiting_approval',
   canExport: (status: DocumentStatus): boolean => status === 'ready',
   canDelete: (status: DocumentStatus): boolean => status !== 'in_progress',

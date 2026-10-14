@@ -23,11 +23,11 @@ describe('statusMeta', () => {
 });
 
 describe('documentPolicy (зеркало DocumentLifecycle)', () => {
-  it('источники заблокированы в in_progress и awaiting_approval', () => {
+  it('источники заблокированы только в in_progress', () => {
     expect(documentPolicy.canEditSources('draft')).toBe(true);
+    expect(documentPolicy.canEditSources('awaiting_approval')).toBe(true);
     expect(documentPolicy.canEditSources('ready')).toBe(true);
     expect(documentPolicy.canEditSources('in_progress')).toBe(false);
-    expect(documentPolicy.canEditSources('awaiting_approval')).toBe(false);
   });
 
   it('повторный анализ из ready требует подтверждения', () => {
