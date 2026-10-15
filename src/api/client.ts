@@ -13,6 +13,7 @@ import { ApiError, type ErrorBody } from '@/lib/errors';
 import { authSession } from './authSession';
 import { PUBLIC_PATHS, apiBaseUrl } from './config';
 import type { ExtraPaths } from './pathsExtra';
+import type { SourceFilePaths } from './sourceFilePaths';
 import type { paths } from './types';
 
 const RETRY_HEADER = 'X-Auth-Retry';
@@ -47,8 +48,8 @@ export const authMiddleware: Middleware = {
   },
 };
 
-// ExtraPaths — пути, которых ещё нет в сгенерированном openapi.d.ts (см. pathsExtra.ts).
-export const client = createClient<paths & ExtraPaths>({
+// Дополнительные пути до перегенерации openapi.d.ts, включая скачивание источников (#87).
+export const client = createClient<paths & ExtraPaths & SourceFilePaths>({
   baseUrl: apiBaseUrl,
   // fetch берём лениво: так его можно подменить (MSW в тестах) после создания клиента.
   fetch: (input) => globalThis.fetch(input),
