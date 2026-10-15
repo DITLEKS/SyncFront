@@ -133,6 +133,8 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   // Word-документ рисуется из самого файла во всех режимах: в «Оригинале» как есть,
   // в «Правках» и «Чистовике» — с правками поверх рендера docx-preview.
   const isDocx = meta.format === 'docx';
+  // Markdown-документ рисуется как обычный текст с построчной разметкой (значение формата на бэкенде — markdown).
+  const isMarkdown = String(meta.format).toLowerCase() === 'markdown';
   const file = useDocumentFile(projectId, meta.id, isDocx);
 
   const headerSize: ButtonProps['size'] = tablet ? 'default' : 'sm';
@@ -182,8 +184,8 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
     if (selectedId && !selected) setSelectedId(null);
   }, [selectedId, selected]);
 
-  // На десктопе карточка «парит» над текстом рядом с выбранным блоком, не сдвигая ни текст,
-  // ни панель. На узком экране и если фрагмент не найден — остаётся в правой панели.
+  // На десктопе карточка «парит» над текстом рядом с выбранным блоком, не сдвигая ни текст, ни
+  // панель. На узком экране и если фрагмент не найден — остаётся в правой панели.
   const canFloat = desktop && selected !== null;
 
   // Считаем позицию относительно обёртки статьи. По умолчанию карточка под блоком; если снизу
@@ -302,6 +304,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
       selectedId={selectedId}
       onSelect={setSelectedId}
       onUndo={undo}
+      markdown={isMarkdown}
     />
   ) : (
     <p className="text-sm text-muted-foreground">Документ не содержит текста.</p>
