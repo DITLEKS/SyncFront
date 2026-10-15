@@ -25,6 +25,10 @@ import { formatDate, pluralize } from '@/lib/format';
 
 import { NotFoundPage } from './NotFoundPage';
 
+/** Выше этого числа список базовых источников прокручивается, а не растягивает карточку. */
+const SCROLLABLE_SOURCES_FROM = 10;
+const SCROLLABLE_LIST_CLASS = 'max-h-[26rem] overflow-y-auto';
+
 export function ProjectPage() {
   const { projectId = '' } = useParams();
   const navigate = useNavigate();
@@ -55,6 +59,7 @@ export function ProjectPage() {
   const documents = data.documents ?? [];
   const sources = data.sources ?? [];
   const documentCount = data.document_count;
+  const scrollable = sources.length > SCROLLABLE_SOURCES_FROM;
   const uploadButton = (
     <Button onClick={() => setUploading(true)}>
       <FileUp aria-hidden />
@@ -122,14 +127,9 @@ export function ProjectPage() {
       >
         <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 id="base-sources-title" className="text-lg font-semibold">
-                Базовые источники истины
-              </h2>
-              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                для всех документов
-              </span>
-            </div>
+            <h2 id="base-sources-title" className="text-lg font-semibold">
+              Базовые источники истины
+            </h2>
             <p className="text-sm text-muted-foreground">
               Применяются к каждому документу проекта.
             </p>
@@ -164,6 +164,7 @@ export function ProjectPage() {
             items={sources}
             emptyText="Базовых источников пока нет."
             showForm={addingSource}
+            listClassName={scrollable ? SCROLLABLE_LIST_CLASS : undefined}
           />
         )}
       </section>
@@ -184,11 +185,7 @@ export function ProjectPage() {
           />
         ) : (
           <>
-            <ProjectDocumentsList
-              projectId={projectId}
-              documents={documents}
-              baseSources={sources}
-            />
+            <ProjectDocumentsList projectId={projectId} documents={documents} />
             {data.document_count > documents.length ? (
               <p className="mt-2 text-xs text-muted-foreground">
                 Показаны первые {documents.length} документов. Остальные доступны в разделе «Мои
