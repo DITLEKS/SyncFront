@@ -5,6 +5,7 @@ import type { ChangeSegment, Segment } from '@/domain/editor/projection';
 import { changeTypeMeta, decisionLabel, type ChangeType } from '@/domain/editor/suggestion';
 import { cn } from '@/lib/cn';
 
+import { renderMarkdownText } from '../lib/markdownLite';
 import type { ViewMode } from '../model/useEditorModel';
 
 interface DocumentTextProps {
@@ -15,6 +16,8 @@ interface DocumentTextProps {
   onSelect: (id: string) => void;
   /** Быстрая отмена решения кнопкой на самом блоке (появляется при наведении). */
   onUndo?: (id: string) => void;
+  /** Документ в формате Markdown: обычный текст размечается заголовками, списками и т. д. */
+  markdown?: boolean;
 }
 
 /**
@@ -41,6 +44,7 @@ export function DocumentText({
   selectedId,
   onSelect,
   onUndo,
+  markdown = false,
 }: DocumentTextProps) {
   return (
     <div
@@ -48,10 +52,17 @@ export function DocumentText({
       data-testid="document-text"
     >
       {mode === 'original'
-        ? originalText
+        ? markdown
+          ? renderMarkdownText(originalText, true)
+          : originalText
         : segments.map((segment, index) =>
             segment.kind === 'text' ? (
-              <TextPart key={`t${index}`} text={segment.text} />
+              <TextPart
+                key={`t${index}`}
+                text={segment.text}
+                markdown={markdown}
+                atLineStart={index === 0}
+              />
             ) : (
               <ChangePart
                 key={segment.id}
@@ -68,8 +79,16 @@ export function DocumentText({
   );
 }
 
-const TextPart = memo(function TextPart({ text }: { text: string }) {
-  return <>{text}</>;
+const TextPart = memo(function TextPart({
+  text,
+  markdown,
+  atLineStart,
+}: {
+  text: string;
+  markdown: boolean;
+  atLineStart: boolean;
+}) {
+  return <>{markdown ? renderMarkdownText(text, atLineStart) : text}</>;
 });
 
 interface ChangePartProps {

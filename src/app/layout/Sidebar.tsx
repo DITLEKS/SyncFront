@@ -124,10 +124,12 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
       end={item.end}
       className={cn(
         'group mx-auto flex h-12 w-12 items-center justify-center gap-3 rounded-none text-sm font-medium transition-[color,background-color,box-shadow,transform] duration-200 motion-reduce:transition-none',
-        'hover:bg-card/80 hover:text-foreground hover:shadow-sm active:scale-[0.98]',
+        'active:scale-[0.98]',
+        // hover применяется только к неактивным пунктам: иначе hover:bg-* перекрывает bg-accent
+        // активного пункта и выделение пропадает при наведении.
         isActive
           ? 'bg-accent font-semibold text-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.08)]'
-          : 'text-muted-foreground',
+          : 'text-muted-foreground hover:bg-card/80 hover:text-foreground hover:shadow-sm',
         !collapsed && 'md:h-10 md:w-full md:justify-start md:px-3',
       )}
       aria-label={item.label}
