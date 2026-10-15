@@ -405,6 +405,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{project_id}/sources/{source_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Source Download Url
+         * @description Ссылка на скачивание: presigned URL для файла, сам адрес для url-источника.
+         */
+        get: operations["get_source_download_url_api_v1_projects__project_id__sources__source_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/sources/{source_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Source Content
+         * @description Текст источника для просмотра без редактирования.
+         *
+         *     Для url-источника и файла неподдерживаемого формата ответ 200 с preview_available=false:
+         *     это не ошибка, а подсказка фронту показать ссылку или кнопку скачивания.
+         */
+        get: operations["get_source_content_api_v1_projects__project_id__sources__source_id__content_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{project_id}/sources/{source_id}": {
         parameters: {
             query?: never;
@@ -417,9 +460,26 @@ export interface paths {
         post?: never;
         /**
          * Delete Source
-         * @description Удалить источник. 423, если он прикреплён к документу на анализе или ревью.
+         * @description Удалить источник. 423, если он прикреплён к документу, который сейчас анализируется.
          */
         delete: operations["delete_source_api_v1_projects__project_id__sources__source_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{project_id}/sources/{source_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Скачать исходный файл источника через API */
+        get: operations["download_source_file_api_v1_projects__project_id__sources__source_id__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1573,7 +1633,7 @@ export interface components {
         };
         /**
          * SourceBadge
-         * @description Минимум для бейджа источника на карточке документа.
+         * @description Минимум для строки источника на карточке документа: название, тип, адрес, дата.
          */
         SourceBadge: {
             /**
@@ -1588,6 +1648,44 @@ export interface components {
              * @enum {string}
              */
             type: "url" | "file";
+            /** Url */
+            url?: string | null;
+            /** Created At */
+            created_at?: string | null;
+        };
+        /**
+         * SourceContentResponse
+         * @description Содержимое источника для просмотра.
+         *
+         *     preview_available=False — текста нет: url-источник открывается по адресу, файл
+         *     неподдерживаемого формата можно только скачать; причина — в reason.
+         */
+        SourceContentResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "url" | "file";
+            /** Url */
+            url?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Plain Text */
+            plain_text?: string | null;
+            /** Preview Available */
+            preview_available: boolean;
+            /** Reason */
+            reason?: string | null;
         };
         /** SourceCreateRequest */
         SourceCreateRequest: {
@@ -1611,6 +1709,16 @@ export interface components {
             type: "url";
             /** Url */
             url: string;
+        };
+        /** SourceDownloadResponse */
+        SourceDownloadResponse: {
+            /** Download Url */
+            download_url: string;
+            /**
+             * Expires In
+             * @description Срок жизни ссылки в секундах; None для url-источника — это его постоянный адрес
+             */
+            expires_in?: number | null;
         };
         /** SourceResponse */
         SourceResponse: {
@@ -1636,6 +1744,8 @@ export interface components {
              * @enum {string}
              */
             scope: "project" | "document";
+            /** Url */
+            url?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -2710,6 +2820,70 @@ export interface operations {
             };
         };
     };
+    get_source_download_url_api_v1_projects__project_id__sources__source_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceDownloadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_content_api_v1_projects__project_id__sources__source_id__content_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceContentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_source_api_v1_projects__project_id__sources__source_id__delete: {
         parameters: {
             query?: never;
@@ -2728,6 +2902,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_source_file_api_v1_projects__project_id__sources__source_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+                project_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": unknown;
+                };
             };
             /** @description Validation Error */
             422: {

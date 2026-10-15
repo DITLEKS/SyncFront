@@ -1,10 +1,8 @@
 import { client, multipartBody, ok } from '../client';
-import type { SourceContentResponseExtra, SourceDownloadResponseExtra } from '../pathsExtra';
 import type { PageParams, Schemas, SourcePage, SourceResponse } from '../types';
 
 export type SourceScope = Schemas['SourceScopeVO'];
-export type SourceDownload = SourceDownloadResponseExtra;
-export type SourceContent = SourceContentResponseExtra;
+export type SourceContent = Schemas['SourceContentResponse'];
 
 /** Где создаётся источник: для всего проекта или только для одного документа. */
 export type SourceTarget = { scope: 'project' } | { scope: 'document'; documentId: string };
@@ -63,18 +61,6 @@ export async function listSources(
   return ok(
     await client.GET('/api/v1/projects/{project_id}/sources', {
       params: { path: { project_id: projectId }, query: params },
-    }),
-  );
-}
-
-/** Presigned-ссылка на файл источника; для url-источника — его адрес (expires_in = null). */
-export async function getSourceDownloadUrl(
-  projectId: string,
-  sourceId: string,
-): Promise<SourceDownload> {
-  return ok(
-    await client.GET('/api/v1/projects/{project_id}/sources/{source_id}/download', {
-      params: { path: { project_id: projectId, source_id: sourceId } },
     }),
   );
 }
