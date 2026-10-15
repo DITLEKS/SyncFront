@@ -19,8 +19,8 @@ export interface ChangeTypeMeta {
 
 export const changeTypeMeta: Record<ChangeType, ChangeTypeMeta> = {
   modify: { label: 'Изменение', tone: 'amber' },
-  add: { label: 'Добавление', tone: 'emerald' },
-  delete: { label: 'Удаление', tone: 'red' },
+  add: { label: 'Добавить', tone: 'emerald' },
+  delete: { label: 'Удалить', tone: 'red' },
 };
 
 export const decisionLabel: Record<Decision, string> = {
@@ -28,7 +28,7 @@ export const decisionLabel: Record<Decision, string> = {
   rejected: 'Отклонено',
 };
 
-/** Минимум полей правки, нужный доменной логике редактора. */
+/** Минимум полей правки, нужный доменной логикой редактора. */
 export interface EditorSuggestion {
   id: string;
   change_type: ChangeType;
