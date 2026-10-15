@@ -123,7 +123,7 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
       to={item.to}
       end={item.end}
       className={cn(
-        'group mx-auto flex h-12 w-12 items-center justify-center gap-3 rounded-xl text-sm font-medium transition-[color,background-color,box-shadow,transform] duration-200 motion-reduce:transition-none',
+        'group mx-auto flex h-12 w-12 items-center justify-center gap-3 rounded-none text-sm font-medium transition-[color,background-color,box-shadow,transform] duration-200 motion-reduce:transition-none',
         'hover:bg-card/80 hover:text-foreground hover:shadow-sm active:scale-[0.98]',
         isActive
           ? 'bg-accent font-semibold text-accent-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.08)]'
@@ -134,12 +134,6 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
     >
       <item.icon className="size-5 shrink-0" strokeWidth={isActive ? 2.5 : 2} aria-hidden />
       {!collapsed ? <span className="hidden truncate md:inline">{item.label}</span> : null}
-      {isActive && !collapsed ? (
-        <span
-          className="ml-auto hidden size-1.5 shrink-0 rounded-full bg-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.1)] md:block"
-          aria-hidden
-        />
-      ) : null}
     </NavLink>
   );
 

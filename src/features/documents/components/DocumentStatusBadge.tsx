@@ -1,9 +1,10 @@
-import { Loader2 } from 'lucide-react';
-
 import { type DocumentStatus, statusMeta } from '@/domain/document/status';
 import { cn } from '@/lib/cn';
 
-/** Статус документа словом в цвете статуса — без фона, рамки и точки-индикатора. */
+/**
+ * Статус документа словом в цвете статуса — без фона, рамки, точки и спиннера.
+ * Анимацию идущего анализа показывает AnalysisProgress рядом, дублировать её не нужно.
+ */
 export function DocumentStatusBadge({
   status,
   className,
@@ -17,13 +18,12 @@ export function DocumentStatusBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium',
+        'inline-flex items-center whitespace-nowrap text-xs font-medium',
         meta.badgeClassName,
         className,
       )}
       title={meta.description}
     >
-      {status === 'in_progress' ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
       {meta.label}
     </span>
   );
