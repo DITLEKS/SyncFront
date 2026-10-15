@@ -405,26 +405,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/projects/{project_id}/sources/{source_id}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Source Download Url
-         * @description Ссылка на скачивание: presigned URL для файла, сам адрес для url-источника.
-         */
-        get: operations["get_source_download_url_api_v1_projects__project_id__sources__source_id__download_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/projects/{project_id}/sources/{source_id}/content": {
         parameters: {
             query?: never;
@@ -1710,16 +1690,6 @@ export interface components {
             /** Url */
             url: string;
         };
-        /** SourceDownloadResponse */
-        SourceDownloadResponse: {
-            /** Download Url */
-            download_url: string;
-            /**
-             * Expires In
-             * @description Срок жизни ссылки в секундах; None для url-источника — это его постоянный адрес
-             */
-            expires_in?: number | null;
-        };
         /** SourceResponse */
         SourceResponse: {
             /**
@@ -2807,38 +2777,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SourceResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_source_download_url_api_v1_projects__project_id__sources__source_id__download_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                source_id: string;
-                project_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SourceDownloadResponse"];
                 };
             };
             /** @description Validation Error */
