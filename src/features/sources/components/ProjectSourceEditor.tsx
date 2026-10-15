@@ -16,9 +16,14 @@ interface ProjectSourceEditorProps {
   lockedReason?: string;
   emptyText: string;
   showForm?: boolean;
+  /** Классы списка, например ограничение высоты с прокруткой для длинных списков. */
+  listClassName?: string;
 }
 
-/** Источники уже созданного проекта или документа: каждое действие сразу уходит на сервер. */
+/**
+ * Источники уже созданного проекта или документа: каждое действие сразу уходит на сервер.
+ * У каждого источника доступны просмотр и скачивание — список получает projectId.
+ */
 export function ProjectSourceEditor({
   projectId,
   target,
@@ -26,6 +31,7 @@ export function ProjectSourceEditor({
   lockedReason,
   emptyText,
   showForm = true,
+  listClassName,
 }: ProjectSourceEditorProps) {
   const create = useCreateSource(projectId, target);
   const remove = useDeleteSource(projectId);
@@ -35,6 +41,8 @@ export function ProjectSourceEditor({
       {items.length > 0 ? (
         <SourceList
           items={items}
+          projectId={projectId}
+          className={listClassName}
           lockedReason={lockedReason}
           removingId={remove.isPending ? remove.variables : null}
           onRemove={(item) =>

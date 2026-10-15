@@ -45,6 +45,9 @@ export const queryKeys = {
     all: ['sources'] as const,
     byProject: (projectId: string, params: PageParams & { scope?: string } = {}) =>
       ['sources', 'project', projectId, params] as const,
+    /** Текст источника для просмотра; источник неизменяем — кешируется надолго. */
+    content: (projectId: string, sourceId: string) =>
+      ['sources', 'content', projectId, sourceId] as const,
   },
   analysisJobs: {
     all: ['analysis-jobs'] as const,
