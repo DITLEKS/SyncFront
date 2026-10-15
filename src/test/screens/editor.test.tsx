@@ -84,7 +84,7 @@ describe('Редактор правок', () => {
     expect(within(text).getByRole('button', { name: 'Изменение' })).toHaveTextContent(
       '10 дней14 дней',
     );
-    expect(within(text).getByRole('button', { name: 'Удаление' })).toBeInTheDocument();
+    expect(within(text).getByRole('button', { name: 'Удалить' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Правки' })).toBeChecked();
 
     await user.click(screen.getByRole('radio', { name: 'Оригинал' }));
@@ -96,7 +96,7 @@ describe('Редактор правок', () => {
     await user.click(screen.getByRole('radio', { name: 'Чистовик' }));
     const clean = await documentText();
     expect(within(clean).getByRole('button', { name: 'Изменение' })).toBeInTheDocument();
-    expect(within(clean).getByRole('button', { name: 'Удаление' })).toBeInTheDocument();
+    expect(within(clean).getByRole('button', { name: 'Удалить' })).toBeInTheDocument();
   });
 
   it('принимает правку из карточки и сохраняет решение с If-Match', async () => {
@@ -122,7 +122,7 @@ describe('Редактор правок', () => {
     // Принятая правка — без подсветки, но с быстрой отменой; нерассмотренное удаление размечено.
     expect(within(clean).getByRole('button', { name: 'Изменение, принято' })).toBeInTheDocument();
     expect(within(clean).getByRole('button', { name: 'Отменить решение' })).toBeInTheDocument();
-    expect(within(clean).getByRole('button', { name: 'Удаление' })).toBeInTheDocument();
+    expect(within(clean).getByRole('button', { name: 'Удалить' })).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: /^Сохранить$/ })[0]!);
     await waitFor(() => expect(reviewRequests()).toHaveLength(1));
