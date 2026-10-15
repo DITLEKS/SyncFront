@@ -134,7 +134,7 @@ export function EditorScreen({ projectId, editor, refetch }: EditorScreenProps) 
   // в «Правках» и «Чистовике» — с правками поверх рендера docx-preview.
   const isDocx = meta.format === 'docx';
   // Markdown-документ рисуется как обычный текст с построчной разметкой (значение формата на бэкенде — markdown).
-  const isMarkdown = String(meta.format).toLowerCase() === 'markdown';
+  const isMarkdown = meta.format.toLowerCase() === 'markdown';
   const file = useDocumentFile(projectId, meta.id, isDocx);
 
   const headerSize: ButtonProps['size'] = tablet ? 'default' : 'sm';
