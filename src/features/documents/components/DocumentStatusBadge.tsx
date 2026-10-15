@@ -1,28 +1,30 @@
 import { Loader2 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { type DocumentStatus, statusMeta } from '@/domain/document/status';
 import { cn } from '@/lib/cn';
 
+/** Статус документа словом в цвете статуса — без фона, рамки и точки-индикатора. */
 export function DocumentStatusBadge({
   status,
   className,
-  dot = false,
 }: {
   status: DocumentStatus;
   className?: string;
-  /** Цветная точка перед текстом — вариант для шапки редактора по макету. */
+  /** Точек больше нет; параметр оставлен, чтобы не трогать вызовы из шапки редактора. */
   dot?: boolean;
 }) {
   const meta = statusMeta[status];
   return (
-    <Badge className={cn(meta.badgeClassName, className)} title={meta.description}>
-      {status === 'in_progress' ? (
-        <Loader2 className="size-3 animate-spin" aria-hidden />
-      ) : dot ? (
-        <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-current" />
-      ) : null}
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium',
+        meta.badgeClassName,
+        className,
+      )}
+      title={meta.description}
+    >
+      {status === 'in_progress' ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
       {meta.label}
-    </Badge>
+    </span>
   );
 }

@@ -263,7 +263,7 @@ function DocumentRow({ document: doc, onOpen, onDelete }: DocumentRowProps) {
         <Link
           to={`/projects/${doc.project.id}`}
           onClick={stop}
-          className="inline-flex max-w-[12rem] truncate rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
+          className="inline-block max-w-[12rem] truncate text-muted-foreground hover:text-foreground hover:underline"
           title={doc.project.name}
         >
           {doc.project.name}

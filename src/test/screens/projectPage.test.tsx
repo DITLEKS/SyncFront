@@ -37,7 +37,7 @@ function setup() {
 }
 
 describe('Страница проекта', () => {
-  it('показывает цепочку, базовые источники и документы со счётчиком', async () => {
+  it('показывает цепочку, базовые источники и кнопку запуска у каждого документа не в работе', async () => {
     setup();
     expect(
       await screen.findByRole('heading', { name: 'Платёжный шлюз', level: 1 }),
@@ -49,9 +49,13 @@ describe('Страница проекта', () => {
     );
     expect(screen.getByText(/3 документа/)).toBeInTheDocument();
     expect(screen.getByText('Спецификация API')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Анализировать/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Проверить актуальность/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Рассмотреть правки' })).toBeInTheDocument();
+    // ▶ есть у черновика и у документа на ревью; у готового — повторная проверка.
+    expect(screen.getByRole('button', { name: 'Анализировать: draft.md' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Анализировать: review.md' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Проверить актуальность: ready.md' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Рассмотреть правки' })).not.toBeInTheDocument();
   });
 
   it('раскрывает только одну строку источников; на ревью источники можно менять', async () => {
@@ -138,6 +142,19 @@ describe('Страница проекта', () => {
       expect(call?.body).toEqual({ force: true });
       expect(call?.headers?.['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/);
     });
+  });
+
+  it('запуск анализа из «Ожидает утверждения» идёт сразу, без подтверждения', async () => {
+    const user = userEvent.setup();
+    const { review } = setup();
+    await user.click(await screen.findByRole('button', { name: 'Анализировать: review.md' }));
+    await waitFor(() => {
+      const call = db.requests.find((r) =>
+        r.path.endsWith(`/documents/${review.id}/analysis-jobs`),
+      );
+      expect(call?.body).toEqual({ force: false });
+    });
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
   it('показывает причину неудачного анализа у черновика', async () => {

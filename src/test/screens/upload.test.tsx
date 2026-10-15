@@ -28,6 +28,13 @@ async function openFromProject() {
   return { project, user, dialog, ...view };
 }
 
+async function addNote(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement) {
+  await user.click(within(dialog).getByRole('tab', { name: 'Заметка' }));
+  await user.type(within(dialog).getByLabelText('Название'), 'Решение архитектора');
+  await user.type(within(dialog).getByLabelText('Текст заметки'), 'Лимит 100 rps');
+  await user.click(within(dialog).getByRole('button', { name: 'Добавить заметку' }));
+}
+
 describe('Загрузка документа', () => {
   it('отклоняет .doc по правилам capabilities, «Далее» недоступна', async () => {
     const { user, dialog } = await openFromProject();
@@ -36,7 +43,7 @@ describe('Загрузка документа', () => {
     expect(within(dialog).getByRole('button', { name: 'Далее' })).toBeDisabled();
   });
 
-  it('загружает файл, создаёт специфичный источник и запускает анализ', async () => {
+  it('загружает файл, создаёт специфичный источник и сохраняет черновик без анализа', async () => {
     const { user, dialog, project } = await openFromProject();
     await user.upload(
       within(dialog).getByLabelText('Файл документа'),
@@ -46,20 +53,15 @@ describe('Загрузка документа', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Далее' }));
 
     expect(await within(dialog).findByText('Базовая спецификация')).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('tab', { name: 'Заметка' }));
-    await user.type(within(dialog).getByLabelText('Название'), 'Решение архитектора');
-    await user.type(within(dialog).getByLabelText('Текст заметки'), 'Лимит 100 rps');
-    await user.click(within(dialog).getByRole('button', { name: 'Добавить заметку' }));
+    await addNote(user, dialog);
     // «Назад» сохраняет файл и введённые источники
     await user.click(within(dialog).getByRole('button', { name: 'Назад' }));
     expect(within(dialog).getByText('api.md')).toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Далее' }));
     expect(within(dialog).getByText('Решение архитектора')).toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole('button', { name: 'Запустить анализ' }));
-    expect(
-      await within(dialog).findByText(/сравнивает документ с источниками истины/),
-    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     const doc = db.documents.find((d) => d.name === 'api.md');
     expect(doc?.projectId).toBe(project.id);
@@ -69,14 +71,14 @@ describe('Загрузка документа', () => {
       document_id: doc?.id,
       text_content: 'Лимит 100 rps',
     });
+    // Анализ из диалога не запускается: документ остаётся черновиком с кнопкой ▶ в строке.
     const order = db.requests
       .filter((r) => r.method === 'POST')
       .map((r) => r.path.split('/').slice(-1)[0]);
-    expect(order).toEqual(['documents', 'note', 'analysis-jobs']);
-
-    await user.click(within(dialog).getByRole('button', { name: 'Закрыть окно' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(await screen.findByText('Идёт анализ')).toBeInTheDocument();
+    expect(order).toEqual(['documents', 'note']);
+    expect(
+      await screen.findByRole('button', { name: 'Анализировать: api.md' }),
+    ).toBeInTheDocument();
   });
 
   it('ошибка сервера при загрузке: остаёмся в форме с сообщением', async () => {
@@ -88,7 +90,7 @@ describe('Загрузка документа', () => {
     const { user, dialog } = await openFromProject();
     await user.upload(within(dialog).getByLabelText('Файл документа'), new File(['x'], 'big.docx'));
     await user.click(within(dialog).getByRole('button', { name: 'Далее' }));
-    await user.click(await within(dialog).findByRole('button', { name: 'Запустить анализ' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Сохранить' }));
     expect(await within(dialog).findByText('Документ не загружен')).toBeInTheDocument();
     expect(within(dialog).getByText('Файл больше 50 МБ')).toBeInTheDocument();
     expect(db.documents).toHaveLength(0);
@@ -111,46 +113,38 @@ describe('Загрузка документа', () => {
         new File(['x'], 'spec.md'),
       );
       await user.click(within(dialog).getByRole('button', { name: 'Далее' }));
-      await user.click(await within(dialog).findByRole('button', { name: 'Запустить анализ' }));
+      await user.click(await within(dialog).findByRole('button', { name: 'Сохранить' }));
       expect(await within(dialog).findByText('Документ не загружен')).toBeInTheDocument();
       expect(within(dialog).getByText(detail)).toBeInTheDocument();
       expect(db.documents).toHaveLength(0);
     },
   );
 
-  it('если задача не создалась, документ остаётся черновиком и повтор не загружает файл заново', async () => {
+  it('если источник не добавился, документ уже сохранён и повтор не загружает файл заново', async () => {
     let attempts = 0;
     server.use(
-      http.post('/api/v1/projects/:projectId/documents/:documentId/analysis-jobs', () => {
+      http.post('/api/v1/projects/:projectId/sources/note', () => {
         attempts += 1;
+        // Первая попытка падает; дальше запрос уходит к обычному обработчику бэкенда.
         return attempts === 1
-          ? HttpResponse.json({ detail: 'Слишком много запросов' }, { status: 429 })
-          : HttpResponse.json(
-              {
-                id: 'job-1',
-                document_id: 'x',
-                status: 'pending',
-                error_code: null,
-                error_message: null,
-                retry_count: 0,
-                created_at: '2026-10-04T10:00:00Z',
-                started_at: null,
-                finished_at: null,
-                partial_success: false,
-              },
-              { status: 202 },
-            );
+          ? HttpResponse.json({ detail: 'Текст заметки слишком длинный' }, { status: 422 })
+          : undefined;
       }),
     );
     const { user, dialog } = await openFromProject();
     await user.upload(within(dialog).getByLabelText('Файл документа'), new File(['x'], 'a.txt'));
     await user.click(within(dialog).getByRole('button', { name: 'Далее' }));
-    await user.click(await within(dialog).findByRole('button', { name: 'Запустить анализ' }));
+    await addNote(user, dialog);
+    await user.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
     expect(
-      await within(dialog).findByText('Документ загружен, но анализ не запущен'),
+      await within(dialog).findByText('Документ загружен, но часть источников не добавилась'),
     ).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('button', { name: 'Запустить анализ' }));
+    expect(within(dialog).getByText(/Текст заметки слишком длинный/)).toBeInTheDocument();
+    expect(db.documents).toHaveLength(1);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
     await waitFor(() => expect(attempts).toBe(2));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(
       db.requests.filter((r) => r.method === 'POST' && r.path.endsWith('/documents')),
     ).toHaveLength(1);

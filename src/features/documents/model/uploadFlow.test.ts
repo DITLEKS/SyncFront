@@ -37,6 +37,20 @@ describe('runUploadFlow', () => {
     );
   });
 
+  it('runAnalysis=false — документ и источники сохранены, анализ не запущен', async () => {
+    const deps = api();
+    const result = await runUploadFlow(deps, {
+      projectId: 'p',
+      file,
+      drafts: [draft],
+      uploaded: null,
+      runAnalysis: false,
+    });
+    expect(result).toEqual({ kind: 'saved', document: doc });
+    expect(deps.createSource).toHaveBeenCalledTimes(1);
+    expect(deps.startAnalysis).not.toHaveBeenCalled();
+  });
+
   it('ошибка загрузки — документ не создан', async () => {
     const deps = api({
       upload: vi

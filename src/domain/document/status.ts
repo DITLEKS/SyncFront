@@ -13,7 +13,7 @@ export type StatusTone = 'neutral' | 'info' | 'warning' | 'success';
 export interface StatusMeta {
   label: string;
   tone: StatusTone;
-  /** Классы Tailwind для бейджа статуса; цвета заданы «Описанием UI». */
+  /** Классы Tailwind для текста статуса: статус показывается словом в своём цвете, без бейджа. */
   badgeClassName: string;
   description: string;
 }
@@ -22,25 +22,25 @@ export const statusMeta: Record<DocumentStatus, StatusMeta> = {
   draft: {
     label: 'Черновик',
     tone: 'neutral',
-    badgeClassName: 'bg-slate-100 text-slate-700 ring-slate-200',
+    badgeClassName: 'text-slate-600',
     description: 'Загружен, анализ ещё не запущен или не удался',
   },
   in_progress: {
     label: 'В работе',
     tone: 'info',
-    badgeClassName: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
+    badgeClassName: 'text-blue-700',
     description: 'Выполняется ИИ-анализ',
   },
   awaiting_approval: {
     label: 'Ожидает утверждения',
     tone: 'warning',
-    badgeClassName: 'bg-amber-50 text-amber-800 ring-amber-200',
+    badgeClassName: 'text-amber-700',
     description: 'Есть предложения ИИ, которые нужно рассмотреть',
   },
   ready: {
     label: 'Готово',
     tone: 'success',
-    badgeClassName: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    badgeClassName: 'text-emerald-700',
     description: 'Все решения сохранены, документ можно экспортировать',
   },
 };

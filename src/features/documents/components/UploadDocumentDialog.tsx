@@ -30,7 +30,6 @@ import { uuidV4 } from '@/lib/id';
 import { useBaseSources, useInvalidateDocuments, useProjectOptions } from '../hooks/useDocuments';
 import { runUploadFlow, type UploadFlowResult } from '../model/uploadFlow';
 
-import { AnalysisProgress } from './AnalysisProgress';
 import { FileDropzone } from './FileDropzone';
 import { UploadStepper } from './UploadStepper';
 
@@ -41,7 +40,7 @@ interface UploadDocumentDialogProps {
   projectId?: string;
 }
 
-type Stage = 'file' | 'sources' | 'progress';
+type Stage = 'file' | 'sources';
 
 const flowApi = {
   upload: uploadProjectDocument,
@@ -50,6 +49,14 @@ const flowApi = {
     startAnalysis({ projectId, documentId, idempotencyKey: uuidV4() }),
 };
 
+/** Диалог анализ не запускает, поэтому показывает только проблемы загрузки и источников. */
+type FlowProblemResult = Exclude<UploadFlowResult, { kind: 'started' } | { kind: 'saved' }>;
+
+/**
+ * Загрузка документа в два шага: файл → специфичные источники → «Сохранить».
+ * Документ добавляется в проект черновиком; анализ запускается отдельно кнопкой ▶ в строке
+ * документа или «Анализом всех документов».
+ */
 export function UploadDocumentDialog({
   open,
   onOpenChange,
@@ -64,7 +71,7 @@ export function UploadDocumentDialog({
   const [file, setFile] = useState<File | null>(null);
   const [drafts, setDrafts] = useState<SourceDraft[]>([]);
   const [uploaded, setUploaded] = useState<DocumentResponse | null>(null);
-  const [result, setResult] = useState<UploadFlowResult | null>(null);
+  const [problem, setProblem] = useState<FlowProblemResult | null>(null);
   const [running, setRunning] = useState(false);
 
   const projectId = fixedProjectId ?? selectedProjectId;
@@ -76,7 +83,7 @@ export function UploadDocumentDialog({
     setFile(null);
     setDrafts([]);
     setUploaded(null);
-    setResult(null);
+    setProblem(null);
   };
 
   const close = () => {
@@ -85,26 +92,32 @@ export function UploadDocumentDialog({
     reset();
   };
 
-  const launch = async () => {
+  const save = async () => {
     if (!file || !projectId) return;
     setRunning(true);
-    const outcome = await runUploadFlow(flowApi, { projectId, file, drafts, uploaded });
+    const outcome = await runUploadFlow(flowApi, {
+      projectId,
+      file,
+      drafts,
+      uploaded,
+      runAnalysis: false,
+    });
     setRunning(false);
-    setResult(outcome);
     if (outcome.kind !== 'upload_failed') {
       setUploaded(outcome.document);
       void invalidate(projectId);
     }
+    if (outcome.kind === 'saved') {
+      toast.success(`«${outcome.document.name}» добавлен как черновик`);
+      onOpenChange(false);
+      reset();
+      return;
+    }
     if (outcome.kind === 'sources_failed') {
       // Созданные источники больше не черновики: при повторе отправим только оставшиеся.
       setDrafts(outcome.failed.map((f) => f.draft));
-    } else if (outcome.kind === 'analysis_failed' || outcome.kind === 'started') {
-      setDrafts([]);
     }
-    if (outcome.kind === 'started') {
-      setStage('progress');
-      toast.success(`Анализ «${outcome.document.name}» запущен`);
-    }
+    if (outcome.kind !== 'started') setProblem(outcome);
   };
 
   const projectName = projects.data?.items.find((p) => p.id === projectId)?.name ?? null;
@@ -115,13 +128,12 @@ export function UploadDocumentDialog({
         <DialogHeader>
           <DialogTitle>Загрузка документа</DialogTitle>
           <DialogDescription>
-            {stage === 'progress'
-              ? 'Можно закрыть окно: анализ продолжится, документ останется в списке со статусом «В работе».'
-              : 'Документ будет проверен на актуальность по базовым и специфичным источникам истины.'}
+            Документ будет добавлен в проект как черновик. Проверку по источникам истины запускает
+            кнопка ▶ в строке документа.
           </DialogDescription>
         </DialogHeader>
 
-        {stage !== 'progress' ? <UploadStepper current={stage === 'file' ? 0 : 1} /> : null}
+        <UploadStepper current={stage === 'file' ? 0 : 1} />
 
         {stage === 'file' ? (
           <div className="grid gap-4">
@@ -168,9 +180,7 @@ export function UploadDocumentDialog({
               )}
             </div>
           </div>
-        ) : null}
-
-        {stage === 'sources' ? (
+        ) : (
           <div className="grid gap-5">
             <section className="space-y-2" aria-labelledby="upload-base-sources">
               <h3 id="upload-base-sources" className="text-sm font-medium">
@@ -182,7 +192,7 @@ export function UploadDocumentDialog({
               {baseSources.isPending ? (
                 <Skeleton className="h-10" />
               ) : baseSources.data && baseSources.data.length > 0 ? (
-                <SourceList items={baseSources.data} />
+                <SourceList items={baseSources.data} className="max-h-40 overflow-y-auto" />
               ) : (
                 <p className="text-sm text-muted-foreground">
                   В проекте нет базовых источников. Анализ будет опираться только на специфичные.
@@ -228,17 +238,9 @@ export function UploadDocumentDialog({
               </div>
             </section>
           </div>
-        ) : null}
+        )}
 
-        {stage === 'progress' && result?.kind === 'started' ? (
-          <AnalysisProgress
-            projectId={projectId}
-            document={result.document}
-            onOpenDocument={close}
-          />
-        ) : null}
-
-        {result && result.kind !== 'started' ? <FlowProblem result={result} /> : null}
+        {problem ? <FlowProblem result={problem} /> : null}
 
         <DialogFooter>
           {stage === 'file' ? (
@@ -250,30 +252,23 @@ export function UploadDocumentDialog({
                 Далее
               </Button>
             </>
-          ) : null}
-          {stage === 'sources' ? (
+          ) : (
             <>
               <Button variant="outline" disabled={running} onClick={() => setStage('file')}>
                 Назад
               </Button>
-              {uploaded ? (
-                <Button variant="outline" disabled={running} onClick={close}>
-                  Закрыть без анализа
-                </Button>
-              ) : null}
-              <Button loading={running} onClick={() => void launch()}>
-                Запустить анализ
+              <Button loading={running} onClick={() => void save()}>
+                Сохранить
               </Button>
             </>
-          ) : null}
-          {stage === 'progress' ? <Button onClick={close}>Закрыть окно</Button> : null}
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-function FlowProblem({ result }: { result: Exclude<UploadFlowResult, { kind: 'started' }> }) {
+function FlowProblem({ result }: { result: FlowProblemResult }) {
   if (result.kind === 'upload_failed') {
     return (
       <Alert variant="destructive">
@@ -296,7 +291,8 @@ function FlowProblem({ result }: { result: Exclude<UploadFlowResult, { kind: 'st
               </li>
             ))}
           </ul>
-          Анализ не запущен. Исправьте или уберите источник и нажмите «Запустить анализ» ещё раз.
+          Документ уже сохранён как черновик. Исправьте или уберите источник и нажмите «Сохранить»
+          ещё раз.
         </AlertDescription>
       </Alert>
     );
@@ -304,10 +300,9 @@ function FlowProblem({ result }: { result: Exclude<UploadFlowResult, { kind: 'st
   return (
     <Alert variant="warning">
       <AlertCircle />
-      <AlertTitle>Документ загружен, но анализ не запущен</AlertTitle>
+      <AlertTitle>Документ сохранён, но анализ не запущен</AlertTitle>
       <AlertDescription>
-        {result.message}. Документ сохранён как черновик: повторите запуск сейчас или позже кнопкой
-        «Анализировать» в строке документа.
+        {result.message}. Запустите анализ кнопкой ▶ в строке документа.
       </AlertDescription>
     </Alert>
   );
