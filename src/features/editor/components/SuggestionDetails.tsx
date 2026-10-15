@@ -1,4 +1,4 @@
-import { Check, FileText, MessageSquare, TriangleAlert, Undo2, X } from 'lucide-react';
+import { Check, MessageSquare, TriangleAlert, Undo2, X } from 'lucide-react';
 import { useState } from 'react';
 
 import type { SuggestionResponse } from '@/api/types';
@@ -8,6 +8,8 @@ import type { LocatedSuggestion } from '@/domain/editor/projection';
 import { decisionLabel, type Decision, type SuggestionStatus } from '@/domain/editor/suggestion';
 
 import { EDITOR_TEXTS, ISSUE_TEXTS } from '../model/texts';
+
+import { ChangeTypeLabel } from './ChangeTypeLabel';
 
 interface SuggestionDetailsProps {
   suggestion: SuggestionResponse;
@@ -37,11 +39,11 @@ function Fragment({ label, children }: { label: string; children: React.ReactNod
 }
 
 /**
- * Карточка «Предложение ИИ» по макету. Блок «источника» пока показывает раздел документа:
- * источника правки в SuggestionResponse нет (SyncBack#70). «Новый текст» нерассмотренной
- * правки можно отредактировать перед принятием — текст уходит в PUT /review как edited_text
- * (SyncBack#73) и при экспорте заменяет текст ИИ. Для добавления original_text — якорь,
- * после которого встанет новый текст; без найденного якоря правка не применяется (SyncBack#78).
+ * Карточка «Предложение ИИ». Раздел, обоснование и уверенность — обычным текстом, без
+ * цветных плашек. «Новый текст» нерассмотренной правки можно отредактировать перед
+ * принятием — текст уходит в PUT /review как edited_text (SyncBack#73) и при экспорте заменяет
+ * текст ИИ. Для добавления original_text — якорь, после которого встанет новый текст; без
+ * найденного якоря правка не применяется (SyncBack#78).
  */
 export function SuggestionDetails({
   suggestion,
@@ -83,6 +85,7 @@ export function SuggestionDetails({
             <MessageSquare className="size-4 text-primary" aria-hidden />
             Предложение ИИ
           </span>
+          <ChangeTypeLabel type={type} />
           {status !== 'pending' ? (
             <span className="text-xs font-medium text-muted-foreground">
               {decisionLabel[status]}
@@ -96,18 +99,13 @@ export function SuggestionDetails({
       </header>
 
       <div className="space-y-3 p-4">
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-800">
-            <FileText className="size-3.5 shrink-0" aria-hidden />
-            <span className="truncate">
-              {suggestion.section_ref ? `Раздел: ${suggestion.section_ref}` : 'Обоснование'}
-            </span>
-          </p>
-          <p className="mt-1 text-sm text-amber-950">
-            {suggestion.rationale ?? 'ИИ не указал обоснование.'}
-          </p>
+        <div className="space-y-1 text-sm">
+          {suggestion.section_ref ? (
+            <p className="text-xs text-muted-foreground">Раздел: {suggestion.section_ref}</p>
+          ) : null}
+          <p>{suggestion.rationale ?? 'ИИ не указал обоснование.'}</p>
           {confidence !== null ? (
-            <p className="mt-1 text-xs text-amber-800/80">Уверенность ИИ: {confidence}%</p>
+            <p className="text-xs text-muted-foreground">Уверенность ИИ: {confidence}%</p>
           ) : null}
         </div>
 

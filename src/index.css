@@ -40,14 +40,15 @@
     --card-foreground: 255 8.3% 9.4%;
     --popover: 0 0% 100%;
     --popover-foreground: 255 8.3% 9.4%;
-    --primary: 238.7 83.5% 66.7%;
+    /* Акцент — синий (blue-600/700 Tailwind), фиолетовая палитра Figma Make заменена. */
+    --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 0 0% 100%;
     --secondary: 48 15.2% 93.5%;
     --secondary-foreground: 252 4.4% 22.2%;
     --muted: 48 16.1% 93.9%;
     --muted-foreground: 253.3 4.1% 43.3%;
-    --accent: 225.9 100% 96.7%;
-    --accent-foreground: 244.5 57.9% 50.6%;
+    --accent: 214 100% 96.9%;
+    --accent-foreground: 224.3 76.3% 48%;
     /* Более тёмный цвет кнопок сохраняет контраст белого текста. */
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
@@ -61,7 +62,7 @@
     --border-alpha: 0.07;
     --input: 255 8.3% 9.4%;
     --input-alpha: 0.12;
-    --ring: 238.7 83.5% 66.7%;
+    --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
   }
 
