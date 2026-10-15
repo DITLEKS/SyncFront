@@ -2,9 +2,10 @@ import { Download, ExternalLink, Eye } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { getSourceDownloadUrl } from '@/api/resources/sources';
+import { getSourceFile } from '@/api/resources/sourceFiles';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { downloadBlob } from '@/lib/downloadBlob';
 import { getErrorMessage } from '@/lib/errors';
 
 import { SourcePreviewDialog, type PreviewableSource } from './SourcePreviewDialog';
@@ -15,8 +16,8 @@ interface SourceActionsProps {
 }
 
 /**
- * «Открыть» и «Скачать» для источника. Ссылка открывается в новой вкладке напрямую;
- * файл показывается текстом в диалоге, а скачивается по presigned-ссылке хранилища.
+ * Ссылки открываются в новой вкладке; файлы просматриваются текстом в диалоге.
+ * Скачивание файла идёт через API под Bearer, без прямой ссылки на SeaweedFS.
  */
 export function SourceActions({ projectId, source }: SourceActionsProps) {
   const [previewing, setPreviewing] = useState(false);
@@ -26,8 +27,8 @@ export function SourceActions({ projectId, source }: SourceActionsProps) {
   const download = async () => {
     setDownloading(true);
     try {
-      const { download_url: url } = await getSourceDownloadUrl(projectId, source.id);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      const file = await getSourceFile(projectId, source.id, source.name);
+      downloadBlob(file.blob, file.filename);
     } catch (error) {
       toast.error(getErrorMessage(error));
     } finally {
