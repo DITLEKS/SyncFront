@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -70,7 +70,7 @@ export function BulkAnalysisButton({ projectId, documents }: BulkAnalysisButtonP
           )
         }
       >
-        <Sparkles aria-hidden />
+        <Play aria-hidden />
         Анализ всех документов
       </Button>
       <ConfirmDialog

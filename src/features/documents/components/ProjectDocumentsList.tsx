@@ -2,12 +2,12 @@ import { ChevronDown, Library, Loader2, Lock, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import type { DocumentListItem, SourceResponse } from '@/api/types';
+import type { DocumentListItem } from '@/api/types';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { documentPolicy } from '@/domain/document/status';
 import { AnalysisProblem, StartAnalysisButton } from '@/features/analysis';
-import { ProjectSourceEditor, SourceList } from '@/features/sources';
+import { ProjectSourceEditor } from '@/features/sources';
 import { cn } from '@/lib/cn';
 import { formatBytes, formatDate } from '@/lib/format';
 
@@ -20,17 +20,16 @@ import { DocumentStatusBadge } from './DocumentStatusBadge';
 interface ProjectDocumentsListProps {
   projectId: string;
   documents: DocumentListItem[];
-  baseSources: SourceResponse[];
 }
 
 export const LOCKED_SOURCES_TEXT = 'Во время анализа источники доступны только для просмотра';
 
-/** Документы проекта; одновременно раскрыта не больше чем одна строка с источниками. */
-export function ProjectDocumentsList({
-  projectId,
-  documents,
-  baseSources,
-}: ProjectDocumentsListProps) {
+/**
+ * Документы проекта; одновременно раскрыта не больше чем одна строка с источниками.
+ * В раскрытой строке только специфичные источники документа: базовые уже показаны
+ * в карточке проекта выше, дублировать их не нужно.
+ */
+export function ProjectDocumentsList({ projectId, documents }: ProjectDocumentsListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<DocumentToDelete | null>(null);
 
@@ -42,7 +41,6 @@ export function ProjectDocumentsList({
             key={doc.id}
             projectId={projectId}
             document={doc}
-            baseSources={baseSources}
             expanded={expandedId === doc.id}
             onToggle={() => setExpandedId((current) => (current === doc.id ? null : doc.id))}
             onDelete={() => setDeleting({ id: doc.id, name: doc.name, projectId })}
@@ -60,20 +58,12 @@ export function ProjectDocumentsList({
 interface RowProps {
   projectId: string;
   document: DocumentListItem;
-  baseSources: SourceResponse[];
   expanded: boolean;
   onToggle: () => void;
   onDelete: () => void;
 }
 
-function ProjectDocumentRow({
-  projectId,
-  document: doc,
-  baseSources,
-  expanded,
-  onToggle,
-  onDelete,
-}: RowProps) {
+function ProjectDocumentRow({ projectId, document: doc, expanded, onToggle, onDelete }: RowProps) {
   const navigate = useNavigate();
   const href = `/projects/${projectId}/documents/${doc.id}`;
   const panelId = `document-sources-${doc.id}`;
@@ -107,6 +97,7 @@ function ProjectDocumentRow({
           <DocumentStatusBadge status={doc.status} />
         </div>
         <div className="flex items-center gap-1" onClick={stop}>
+          {/* Запуск анализа — значок ▶ во всех статусах, кроме «В работе». */}
           {doc.status === 'in_progress' ? (
             <span
               className="inline-flex h-8 items-center gap-1.5 px-3 text-xs text-muted-foreground"
@@ -115,12 +106,8 @@ function ProjectDocumentRow({
               <Loader2 className="size-3.5 animate-spin" aria-hidden />
               Идёт анализ
             </span>
-          ) : doc.status === 'awaiting_approval' ? (
-            <Button asChild size="sm" variant="outline">
-              <Link to={href}>Рассмотреть правки</Link>
-            </Button>
           ) : (
-            <StartAnalysisButton projectId={projectId} document={doc} />
+            <StartAnalysisButton projectId={projectId} document={doc} iconOnly />
           )}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -140,7 +127,7 @@ function ProjectDocumentRow({
                 <span className="sr-only">Специфичные источники</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Источники документа</TooltipContent>
+            <TooltipContent>Специфичные источники документа</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -164,17 +151,7 @@ function ProjectDocumentRow({
         </div>
       </div>
       {expanded ? (
-        <div id={panelId} className="grid gap-4 border-t bg-muted/20 px-4 py-4 md:grid-cols-2">
-          <section aria-label="Базовые источники проекта" className="space-y-2">
-            <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Базовые источники проекта
-            </h4>
-            {baseSources.length > 0 ? (
-              <SourceList items={baseSources} />
-            ) : (
-              <p className="text-sm text-muted-foreground">Базовых источников нет.</p>
-            )}
-          </section>
+        <div id={panelId} className="border-t bg-muted/20 px-4 py-4">
           <section aria-label="Специфичные источники документа" className="space-y-2">
             <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Специфичные источники

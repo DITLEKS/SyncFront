@@ -1,9 +1,10 @@
-import { Sparkles } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { analysisActionLabel, documentPolicy, type DocumentStatus } from '@/domain/document/status';
 import { getErrorMessage } from '@/lib/errors';
 
@@ -20,12 +21,15 @@ interface StartAnalysisButtonProps {
   variant?: ButtonProps['variant'];
   /** Подпись вместо стандартной, например «Запустить анализ» в диалоге загрузки. */
   label?: string;
+  /** Только значок ▶ с подсказкой — вариант для строки документа в списках. */
+  iconOnly?: boolean;
   onStarted?: () => void;
 }
 
 /**
- * Запуск анализа. Для ready сразу спрашиваем подтверждение; если сервер всё равно
- * ответил 409 confirmation_required (статус успел смениться), показываем тот же диалог.
+ * Запуск анализа. Доступен из любого статуса, кроме «В работе»: из «Ожидает утверждения»
+ * прежние правки сбрасываются сервером, для ready сразу спрашиваем подтверждение; если сервер
+ * всё равно ответил 409 confirmation_required (статус успел смениться), показываем тот же диалог.
  */
 export function StartAnalysisButton({
   projectId,
@@ -33,6 +37,7 @@ export function StartAnalysisButton({
   size = 'sm',
   variant = 'outline',
   label,
+  iconOnly = false,
   onStarted,
 }: StartAnalysisButtonProps) {
   const start = useStartAnalysis(projectId);
@@ -65,21 +70,35 @@ export function StartAnalysisButton({
 
   if (!documentPolicy.canStartAnalysis(document.status)) return null;
 
+  const title = label ?? analysisActionLabel(document.status);
+  const loading = start.isPending && !confirming;
+  const onClick = () =>
+    documentPolicy.analysisNeedsConfirmation(document.status) ? setConfirming(true) : run(false);
+
   return (
     <>
-      <Button
-        size={size}
-        variant={variant}
-        loading={start.isPending && !confirming}
-        onClick={() =>
-          documentPolicy.analysisNeedsConfirmation(document.status)
-            ? setConfirming(true)
-            : run(false)
-        }
-      >
-        <Sparkles aria-hidden />
-        {label ?? analysisActionLabel(document.status)}
-      </Button>
+      {iconOnly ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="iconSm"
+              variant="ghost"
+              className="text-primary hover:text-primary"
+              aria-label={`${title}: ${document.name}`}
+              loading={loading}
+              onClick={onClick}
+            >
+              <Play aria-hidden />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{title}</TooltipContent>
+        </Tooltip>
+      ) : (
+        <Button size={size} variant={variant} loading={loading} onClick={onClick}>
+          <Play aria-hidden />
+          {title}
+        </Button>
+      )}
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
