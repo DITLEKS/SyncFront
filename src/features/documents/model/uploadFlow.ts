@@ -20,6 +20,8 @@ export interface UploadFlowInput {
   drafts: SourceDraft[];
   /** Документ уже загружен в прошлой попытке: повторно файл не отправляем. */
   uploaded: DocumentResponse | null;
+  /** false — только сохранить документ черновиком, анализ не запускать. По умолчанию true. */
+  runAnalysis?: boolean;
 }
 
 export type UploadFlowResult =
@@ -29,13 +31,15 @@ export type UploadFlowResult =
       document: DocumentResponse;
       failed: { draft: SourceDraft; message: string }[];
     }
+  | { kind: 'saved'; document: DocumentResponse }
   | { kind: 'analysis_failed'; document: DocumentResponse; message: string }
   | { kind: 'started'; document: DocumentResponse; job: AnalysisJobResponse };
 
 /**
- * «Запустить анализ» в диалоге загрузки: файл → специфичные источники → задача анализа.
+ * Диалог загрузки: файл → специфичные источники → (по желанию) задача анализа.
  * Если источник не добавился, анализ не запускаем: иначе он прошёл бы без части входных
- * данных. Документ при этом уже существует и остаётся черновиком.
+ * данных. Документ при этом уже существует и остаётся черновиком — его можно
+ * проанализировать позже кнопкой ▶ в строке документа.
  */
 export async function runUploadFlow(
   api: UploadFlowApi,
@@ -60,6 +64,7 @@ export async function runUploadFlow(
     }
   }
   if (failed.length > 0) return { kind: 'sources_failed', document, failed };
+  if (input.runAnalysis === false) return { kind: 'saved', document };
 
   try {
     const job = await api.startAnalysis(input.projectId, document.id);
