@@ -53,6 +53,8 @@ describe('SuggestionDetails', () => {
     expect(link).toHaveAttribute('href', 'https://example.com/security-policy');
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(screen.getByText('Введен обязательный второй фактор аутентификации.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Введен обязательный второй фактор аутентификации.'),
+    ).toBeInTheDocument();
   });
 });
