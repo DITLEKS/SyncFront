@@ -45,4 +45,19 @@ describe('buildProjection: originOffset', () => {
 
     expect(result.located[add.id]?.originOffset).toBe('первая строка'.length);
   });
+
+  it('различает add-якоря внутри одного абзаца', () => {
+    const later = suggestion('add-later', 'add', 'третье предложение');
+    const earlier = suggestion('add-earlier', 'add', 'первое предложение');
+    const result = buildProjection({
+      text: 'первое предложение. второе предложение. третье предложение.',
+      sections: [],
+      format: 'txt',
+      suggestions: [later, earlier],
+      statusOf: (item) => item.status,
+    });
+
+    expect(result.located[earlier.id]?.originOffset).toBe(18);
+    expect(result.located[later.id]?.originOffset).toBe(58);
+  });
 });
