@@ -79,6 +79,7 @@ export function SuggestionsPanel({
   header,
 }: SuggestionsPanelProps) {
   const [filter, setFilter] = useState<SuggestionFilter>('pending');
+  const panelRef = useRef<HTMLElement>(null);
 
   const filtered = useMemo(
     () =>
@@ -131,6 +132,11 @@ export function SuggestionsPanel({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [canReview, filtered, onDecide, onSelect, selectedId, statusOf]);
 
+  const selectSuggestion = (id: string) => {
+    onSelect(id);
+    panelRef.current?.focus({ preventScroll: true });
+  };
+
   const renderCard = (s: SuggestionResponse) => (
     <SuggestionCard
       suggestion={s}
@@ -139,14 +145,19 @@ export function SuggestionsPanel({
       selected={s.id === selectedId}
       unsaved={unsavedIds.has(s.id)}
       canReview={canReview}
-      onSelect={onSelect}
+      onSelect={selectSuggestion}
       onDecide={onDecide}
       onUndo={onUndo}
     />
   );
 
   return (
-    <aside aria-labelledby="suggestions-title" className="flex min-h-0 flex-col gap-5">
+    <aside
+      ref={panelRef}
+      tabIndex={-1}
+      aria-labelledby="suggestions-title"
+      className="flex min-h-0 flex-col gap-5 outline-none"
+    >
       {/* Шапка панели отделена линией от фильтра и списка — как на макете. */}
       <div className="space-y-2 border-b pb-5">
         <div className="flex items-center justify-between gap-2">
