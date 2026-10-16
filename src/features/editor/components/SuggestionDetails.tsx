@@ -1,4 +1,12 @@
-import { Check, MessageSquare, TriangleAlert, Undo2, X } from 'lucide-react';
+import {
+  Check,
+  ExternalLink,
+  FileText,
+  MessageSquare,
+  TriangleAlert,
+  Undo2,
+  X,
+} from 'lucide-react';
 import { useState } from 'react';
 
 import type { SuggestionResponse } from '@/api/types';
@@ -6,6 +14,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import type { LocatedSuggestion } from '@/domain/editor/projection';
 import { decisionLabel, type Decision, type SuggestionStatus } from '@/domain/editor/suggestion';
+import { SourcePreviewDialog } from '@/features/sources';
 
 import { EDITOR_TEXTS, ISSUE_TEXTS } from '../model/texts';
 
@@ -39,11 +48,10 @@ function Fragment({ label, children }: { label: string; children: React.ReactNod
 }
 
 /**
- * Карточка «Предложение ИИ». Раздел, обоснование и уверенность — обычным текстом, без
- * цветных плашек. «Новый текст» нерассмотренной правки можно отредактировать перед
- * принятием — текст уходит в PUT /review как edited_text (SyncBack#73) и при экспорте заменяет
- * текст ИИ. Для добавления original_text — якорь, после которого встанет новый текст; без
- * найденного якоря правка не применяется (SyncBack#78).
+ * Карточка «Предложение ИИ». Раздел, источник, обоснование и уверенность — обычным текстом.
+ * «Новый текст» нерассмотренной правки можно отредактировать перед принятием — текст уходит
+ * в PUT /review как edited_text и при экспорте заменяет текст ИИ. Для добавления original_text —
+ * якорь, после которого встанет новый текст; без найденного якоря правка не применяется.
  */
 export function SuggestionDetails({
   suggestion,
@@ -59,6 +67,7 @@ export function SuggestionDetails({
 }: SuggestionDetailsProps) {
   const { change_type: type } = suggestion;
   const [draft, setDraft] = useState(newText);
+  const [sourceOpen, setSourceOpen] = useState(false);
   const confidence =
     typeof suggestion.confidence_score === 'number'
       ? Math.round(suggestion.confidence_score * 100)
@@ -103,6 +112,30 @@ export function SuggestionDetails({
           {suggestion.section_ref ? (
             <p className="text-xs text-muted-foreground">Раздел: {suggestion.section_ref}</p>
           ) : null}
+          {suggestion.source ? (
+            suggestion.source.type === 'url' && suggestion.source.url ? (
+              <a
+                href={suggestion.source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+              >
+                <ExternalLink className="size-3.5" aria-hidden />
+                Источник: {suggestion.source.name}
+              </a>
+            ) : (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 text-left font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+                onClick={() => setSourceOpen(true)}
+              >
+                <FileText className="size-3.5 shrink-0" aria-hidden />
+                Источник: {suggestion.source.name}
+              </button>
+            )
+          ) : (
+            <p className="font-medium text-muted-foreground">Источник недоступен</p>
+          )}
           <p>{suggestion.rationale ?? 'ИИ не указал обоснование.'}</p>
           {confidence !== null ? (
             <p className="text-xs text-muted-foreground">Уверенность ИИ: {confidence}%</p>
@@ -172,6 +205,14 @@ export function SuggestionDetails({
           ) : null}
         </div>
       </div>
+      {suggestion.source && suggestion.source.type === 'file' ? (
+        <SourcePreviewDialog
+          projectId={suggestion.source.project_id}
+          source={suggestion.source}
+          open={sourceOpen}
+          onOpenChange={setSourceOpen}
+        />
+      ) : null}
     </section>
   );
 }
