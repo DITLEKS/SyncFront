@@ -9,7 +9,7 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { SuggestionResponse } from '@/api/types';
 import { Progress } from '@/components/ui/progress';
@@ -26,6 +26,7 @@ import {
   isVirtualized,
   LIST_OVERSCAN,
 } from '../model/suggestionList';
+import { orderSuggestions } from '../model/orderSuggestions';
 import { EMPTY_FILTER_TEXTS, ISSUE_TEXTS } from '../model/texts';
 
 import { ChangeTypeLabel } from './ChangeTypeLabel';
@@ -51,6 +52,15 @@ interface SuggestionsPanelProps {
   header?: React.ReactNode;
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest(
+      'input, textarea, select, button, [contenteditable]:not([contenteditable="false"])',
+    ),
+  );
+}
+
 function shortText(s: SuggestionResponse): string {
   return (s.change_type === 'delete' ? s.original_text : s.suggested_text) ?? '';
 }
@@ -70,12 +80,56 @@ export function SuggestionsPanel({
 }: SuggestionsPanelProps) {
   const [filter, setFilter] = useState<SuggestionFilter>('pending');
 
-  const filtered = suggestions.filter((s) => {
-    const status = statusOf(s);
-    if (filter === 'pending') return status === 'pending';
-    if (filter === 'decided') return status !== 'pending';
-    return true;
-  });
+  const filtered = useMemo(
+    () =>
+      orderSuggestions(suggestions, located).filter((s) => {
+        const status = statusOf(s);
+        if (filter === 'pending') return status === 'pending';
+        if (filter === 'decided') return status !== 'pending';
+        return true;
+      }),
+    [filter, located, statusOf, suggestions],
+  );
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey
+      )
+        return;
+      if (isEditableTarget(event.target) || filtered.length === 0) return;
+
+      const selectedIndex = filtered.findIndex((suggestion) => suggestion.id === selectedId);
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex =
+          selectedIndex === -1
+            ? delta > 0
+              ? 0
+              : filtered.length - 1
+            : Math.min(filtered.length - 1, Math.max(0, selectedIndex + delta));
+        const next = filtered[nextIndex];
+        if (next) onSelect(next.id);
+        return;
+      }
+
+      if (event.key === 'Enter' && selectedIndex >= 0) {
+        const selected = filtered[selectedIndex];
+        if (selected && canReview && statusOf(selected) === 'pending' && onDecide) {
+          event.preventDefault();
+          onDecide(selected.id, 'accepted');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [canReview, filtered, onDecide, onSelect, selectedId, statusOf]);
 
   const renderCard = (s: SuggestionResponse) => (
     <SuggestionCard
