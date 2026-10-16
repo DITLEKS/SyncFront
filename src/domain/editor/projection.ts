@@ -290,7 +290,7 @@ function placeAddition(
   const at = newline === -1 ? hit.piece.text.length : newline;
   return {
     pieces: splitPiece(pieces, hit.index, at, change),
-    originOffset: hit.piece.origin + at,
+    originOffset: hit.piece.origin + hit.start + anchor.length,
   };
 }
 
