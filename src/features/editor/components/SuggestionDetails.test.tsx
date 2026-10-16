@@ -9,14 +9,15 @@ const suggestion: SuggestionResponse = {
   id: 'g-0001-4000-8000-000000000000',
   document_id: 'd-0001-4000-8000-000000000000',
   analysis_job_id: 'j-0001-4000-8000-000000000000',
-  source_id: 's-0001-4000-8000-000000000000',
-  source: {
-    id: 's-0001-4000-8000-000000000000',
-    project_id: 'p-0001-4000-8000-000000000000',
-    name: 'Регламент безопасности',
-    type: 'url',
-    url: 'https://example.com/security-policy',
-  },
+  sources: [
+    {
+      id: 's-0001-4000-8000-000000000000',
+      project_id: 'p-0001-4000-8000-000000000000',
+      name: 'Регламент безопасности',
+      type: 'url',
+      url: 'https://example.com/security-policy',
+    },
+  ],
   section_ref: 'Общие положения и доступ',
   change_type: 'modify',
   original_text: 'Для входа достаточно логина и пароля.',

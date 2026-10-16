@@ -46,8 +46,7 @@ export interface SuggestionSourceResponse {
 
 /** Временно расширяет сгенерированный контракт до регенерации OpenAPI после SyncBack. */
 export type SuggestionResponse = Schemas['SuggestionResponse'] & {
-  source_id?: string | null;
-  source?: SuggestionSourceResponse | null;
+  sources?: SuggestionSourceResponse[];
 };
 export type EditorAggregateResponse = Schemas['EditorAggregateResponse'];
 export type ReviewSaveRequest = Schemas['ReviewSaveRequest'];

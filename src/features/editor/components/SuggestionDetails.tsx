@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
-import type { SuggestionResponse } from '@/api/types';
+import type { SuggestionResponse, SuggestionSourceResponse } from '@/api/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import type { LocatedSuggestion } from '@/domain/editor/projection';
@@ -67,7 +67,8 @@ export function SuggestionDetails({
 }: SuggestionDetailsProps) {
   const { change_type: type } = suggestion;
   const [draft, setDraft] = useState(newText);
-  const [sourceOpen, setSourceOpen] = useState(false);
+  const [previewSource, setPreviewSource] = useState<SuggestionSourceResponse | null>(null);
+  const sources = suggestion.sources ?? [];
   const confidence =
     typeof suggestion.confidence_score === 'number'
       ? Math.round(suggestion.confidence_score * 100)
@@ -112,27 +113,33 @@ export function SuggestionDetails({
           {suggestion.section_ref ? (
             <p className="text-xs text-muted-foreground">Раздел: {suggestion.section_ref}</p>
           ) : null}
-          {suggestion.source ? (
-            suggestion.source.type === 'url' && suggestion.source.url ? (
-              <a
-                href={suggestion.source.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 font-medium text-primary underline underline-offset-4 hover:text-primary/80"
-              >
-                <ExternalLink className="size-3.5" aria-hidden />
-                Источник: {suggestion.source.name}
-              </a>
-            ) : (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1.5 text-left font-medium text-primary underline underline-offset-4 hover:text-primary/80"
-                onClick={() => setSourceOpen(true)}
-              >
-                <FileText className="size-3.5 shrink-0" aria-hidden />
-                Источник: {suggestion.source.name}
-              </button>
-            )
+          {sources.length > 0 ? (
+            <div className="space-y-1" aria-label="Источники правки">
+              {sources.map((source) =>
+                source.type === 'url' && source.url ? (
+                  <a
+                    key={source.id}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-fit items-center gap-1.5 font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+                  >
+                    <ExternalLink className="size-3.5" aria-hidden />
+                    Источник: {source.name}
+                  </a>
+                ) : (
+                  <button
+                    key={source.id}
+                    type="button"
+                    className="flex items-center gap-1.5 text-left font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+                    onClick={() => setPreviewSource(source)}
+                  >
+                    <FileText className="size-3.5 shrink-0" aria-hidden />
+                    Источник: {source.name}
+                  </button>
+                ),
+              )}
+            </div>
           ) : (
             <p className="font-medium text-muted-foreground">Источник недоступен</p>
           )}
@@ -205,12 +212,14 @@ export function SuggestionDetails({
           ) : null}
         </div>
       </div>
-      {suggestion.source && suggestion.source.type === 'file' ? (
+      {previewSource ? (
         <SourcePreviewDialog
-          projectId={suggestion.source.project_id}
-          source={suggestion.source}
-          open={sourceOpen}
-          onOpenChange={setSourceOpen}
+          projectId={previewSource.project_id}
+          source={previewSource}
+          open
+          onOpenChange={(open) => {
+            if (!open) setPreviewSource(null);
+          }}
         />
       ) : null}
     </section>
