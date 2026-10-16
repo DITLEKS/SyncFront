@@ -115,6 +115,14 @@ describe('SuggestionsPanel', () => {
     expect(onDecide).toHaveBeenCalledWith('early', 'accepted');
   });
 
+  it('переводит фокус с карточки на панель, чтобы стрелки работали после клика', () => {
+    const { onSelect } = renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: /Раньше/ }));
+    expect(document.activeElement).toBe(screen.getByRole('complementary'));
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'ArrowDown' });
+    expect(onSelect).toHaveBeenLastCalledWith('late');
+  });
+
   it.each(['input', 'textarea', 'select', 'button'])('не перехватывает клавиши в %s', (tag) => {
     const { onSelect, onDecide } = renderPanel();
     const element = document.createElement(tag);
