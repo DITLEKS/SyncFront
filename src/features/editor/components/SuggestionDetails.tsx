@@ -1,11 +1,20 @@
-import { Check, MessageSquare, TriangleAlert, Undo2, X } from 'lucide-react';
+import {
+  Check,
+  ExternalLink,
+  FileText,
+  MessageSquare,
+  TriangleAlert,
+  Undo2,
+  X,
+} from 'lucide-react';
 import { useState } from 'react';
 
-import type { SuggestionResponse } from '@/api/types';
+import type { SuggestionResponse, SuggestionSourceResponse } from '@/api/types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import type { LocatedSuggestion } from '@/domain/editor/projection';
 import { decisionLabel, type Decision, type SuggestionStatus } from '@/domain/editor/suggestion';
+import { SourcePreviewDialog } from '@/features/sources';
 
 import { EDITOR_TEXTS, ISSUE_TEXTS } from '../model/texts';
 
@@ -39,11 +48,10 @@ function Fragment({ label, children }: { label: string; children: React.ReactNod
 }
 
 /**
- * Карточка «Предложение ИИ». Раздел, обоснование и уверенность — обычным текстом, без
- * цветных плашек. «Новый текст» нерассмотренной правки можно отредактировать перед
- * принятием — текст уходит в PUT /review как edited_text (SyncBack#73) и при экспорте заменяет
- * текст ИИ. Для добавления original_text — якорь, после которого встанет новый текст; без
- * найденного якоря правка не применяется (SyncBack#78).
+ * Карточка «Предложение ИИ». Раздел, источник, обоснование и уверенность — обычным текстом.
+ * «Новый текст» нерассмотренной правки можно отредактировать перед принятием — текст уходит
+ * в PUT /review как edited_text и при экспорте заменяет текст ИИ. Для добавления original_text —
+ * якорь, после которого встанет новый текст; без найденного якоря правка не применяется.
  */
 export function SuggestionDetails({
   suggestion,
@@ -59,6 +67,8 @@ export function SuggestionDetails({
 }: SuggestionDetailsProps) {
   const { change_type: type } = suggestion;
   const [draft, setDraft] = useState(newText);
+  const [previewSource, setPreviewSource] = useState<SuggestionSourceResponse | null>(null);
+  const sources = suggestion.sources ?? [];
   const confidence =
     typeof suggestion.confidence_score === 'number'
       ? Math.round(suggestion.confidence_score * 100)
@@ -103,6 +113,36 @@ export function SuggestionDetails({
           {suggestion.section_ref ? (
             <p className="text-xs text-muted-foreground">Раздел: {suggestion.section_ref}</p>
           ) : null}
+          {sources.length > 0 ? (
+            <div className="space-y-1" aria-label="Источники правки">
+              {sources.map((source) =>
+                source.type === 'url' && source.url ? (
+                  <a
+                    key={source.id}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-fit items-center gap-1.5 font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+                  >
+                    <ExternalLink className="size-3.5" aria-hidden />
+                    Источник: {source.name}
+                  </a>
+                ) : (
+                  <button
+                    key={source.id}
+                    type="button"
+                    className="flex items-center gap-1.5 text-left font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+                    onClick={() => setPreviewSource(source)}
+                  >
+                    <FileText className="size-3.5 shrink-0" aria-hidden />
+                    Источник: {source.name}
+                  </button>
+                ),
+              )}
+            </div>
+          ) : (
+            <p className="font-medium text-muted-foreground">Источник недоступен</p>
+          )}
           <p>{suggestion.rationale ?? 'ИИ не указал обоснование.'}</p>
           {confidence !== null ? (
             <p className="text-xs text-muted-foreground">Уверенность ИИ: {confidence}%</p>
@@ -172,6 +212,16 @@ export function SuggestionDetails({
           ) : null}
         </div>
       </div>
+      {previewSource ? (
+        <SourcePreviewDialog
+          projectId={previewSource.project_id}
+          source={previewSource}
+          open
+          onOpenChange={(open) => {
+            if (!open) setPreviewSource(null);
+          }}
+        />
+      ) : null}
     </section>
   );
 }
