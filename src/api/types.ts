@@ -36,7 +36,19 @@ export type SourcePage = Schemas['Page_SourceResponse_'];
 export type AnalysisJobResponse = Schemas['AnalysisJobResponse'];
 export type BulkAnalysisJobsResponse = Schemas['BulkAnalysisJobsResponse'];
 
-export type SuggestionResponse = Schemas['SuggestionResponse'];
+export interface SuggestionSourceResponse {
+  id: string;
+  project_id: string;
+  name: string;
+  type: 'url' | 'file';
+  url?: string | null;
+}
+
+/** Временно расширяет сгенерированный контракт до регенерации OpenAPI после SyncBack. */
+export type SuggestionResponse = Schemas['SuggestionResponse'] & {
+  source_id?: string | null;
+  source?: SuggestionSourceResponse | null;
+};
 export type EditorAggregateResponse = Schemas['EditorAggregateResponse'];
 export type ReviewSaveRequest = Schemas['ReviewSaveRequest'];
 export type ReviewSaveResponse = Schemas['ReviewSaveResponse'];
